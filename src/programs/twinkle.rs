@@ -13,20 +13,26 @@ pub struct Twinkle {
 }
 
 impl Twinkle {
-    fn update(&mut self) -> Option<u8> {
+    fn update(&mut self) -> Option<(u8, u8)> {
         if self.state {
             self.brightness -= self.rate;
             if self.brightness <= 0. {
                 return None;
             }
-            Some(self.brightness as u8)
+            Some((
+                self.brightness as u8,
+                ((self.brightness / 255.) * self.extra_co as f32) as u8,
+            ))
         } else {
             self.brightness += self.rate;
             if self.brightness >= 255. {
                 self.brightness = 255.;
                 self.state = true;
             }
-            Some(self.brightness as u8)
+            Some((
+                self.brightness as u8,
+                ((self.brightness / 255.) * self.extra_co as f32) as u8,
+            ))
         }
     }
 }
@@ -40,9 +46,8 @@ pub unsafe fn twinkle() {
     for (twinkle, color) in (&mut ACTIVE[..]).into_iter().zip(STRIP.iter_mut()) {
         let mut r = false;
         *color = if let Some(twinkle) = twinkle {
-            if let Some(c) = twinkle.update() {
-                let b = (c as u32 * twinkle.extra_co as u32) / 255;
-                [b as u8, b as u8, c]
+            if let Some((c, b)) = twinkle.update() {
+                [b, c, b]
             } else {
                 r = true;
                 [0, 0, 0]
