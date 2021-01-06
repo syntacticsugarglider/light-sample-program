@@ -1,3 +1,9 @@
+use core::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use crate::STRIP;
 
 pub unsafe fn clear() {
@@ -6,54 +12,70 @@ pub unsafe fn clear() {
     }
 }
 
+pub(super) static mut CURRENT_TICK: bool = false;
+pub(super) static mut TICKS_ELAPSED: u64 = 0;
+
+pub fn next_tick() -> NextTick {
+    NextTick::new()
+}
+
+pub fn delay(ticks: u64) -> Delay {
+    Delay::new(ticks)
+}
+
 pub struct Delay {
-    counter: u32,
-    duration: u32,
+    end: u64,
 }
 
 impl Delay {
-    pub const fn new(duration: u32) -> Self {
+    fn new(duration: u64) -> Self {
         Delay {
-            counter: 0,
-            duration,
+            end: unsafe { TICKS_ELAPSED } + duration,
         }
     }
+}
 
-    #[doc(hidden)]
-    pub fn step(&mut self) -> bool {
-        if self.counter < self.duration {
-            self.counter += 1;
-            false
+impl Future for Delay {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.end > unsafe { TICKS_ELAPSED } {
+            Poll::Pending
         } else {
-            true
+            Poll::Ready(())
         }
     }
+}
 
-    pub fn reset(&mut self) {
-        self.counter = 0;
+pub struct NextTick {
+    initial: bool,
+    complete: bool,
+}
+
+impl NextTick {
+    fn new() -> Self {
+        unsafe {
+            NextTick {
+                initial: CURRENT_TICK,
+                complete: false,
+            }
+        }
     }
 }
 
-#[macro_export]
-macro_rules! wait {
-    ($name:expr) => {
-        #[allow(unused_unsafe)]
-        unsafe {
-            let delay: &mut crate::util::Delay = &mut $name;
-            if !crate::util::Delay::step(delay) {
-                return;
+impl Future for NextTick {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.complete {
+            Poll::Ready(())
+        } else {
+            if self.initial == unsafe { CURRENT_TICK } {
+                Poll::Pending
+            } else {
+                self.complete = true;
+                Poll::Ready(())
             }
-        };
-    };
+        }
+    }
 }
-
-#[macro_export]
-macro_rules! Delay {
-    ($($name:ident for $length:literal),+) => {
-        $(
-            static mut $name: Delay = Delay::new($length);
-        )+
-    };
-}
-
-pub use crate::{wait, Delay};

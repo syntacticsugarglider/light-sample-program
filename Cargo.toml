@@ -11,3 +11,6 @@ crate-type = ["cdylib"]
 opt-level = 'z'
 panic = 'abort'
 lto = true
+
+[dependencies]
+pin-project = "1.0.3"

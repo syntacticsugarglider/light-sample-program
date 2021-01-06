@@ -1,6 +1,8 @@
+use core::future::Future;
+
 use crate::{
     rand::{rand_bool, rand_logit, rand_u8},
-    util::clear,
+    util::{clear, next_tick},
     STRIP,
 };
 
@@ -39,32 +41,39 @@ impl Twinkle {
 
 static mut ACTIVE: &'static mut [Option<Twinkle>; 75] = &mut [None; 75];
 
-#[allow(dead_code)]
-pub unsafe fn twinkle() {
-    clear();
+pub type Program = impl Future<Output = ()>;
 
-    for (twinkle, color) in (&mut ACTIVE[..]).into_iter().zip(STRIP.iter_mut()) {
-        let mut r = false;
-        *color = if let Some(twinkle) = twinkle {
-            if let Some((c, b)) = twinkle.update() {
-                [b, c, b]
-            } else {
-                r = true;
-                [0, 0, 0]
+#[allow(dead_code)]
+pub unsafe fn twinkle() -> Program {
+    async move {
+        loop {
+            clear();
+
+            for (twinkle, color) in (&mut ACTIVE[..]).into_iter().zip(STRIP.iter_mut()) {
+                let mut r = false;
+                *color = if let Some(twinkle) = twinkle {
+                    if let Some((c, b)) = twinkle.update() {
+                        [b, b, c]
+                    } else {
+                        r = true;
+                        [0, 0, 0]
+                    }
+                } else {
+                    if rand_bool(Some(0.01)) {
+                        *twinkle = Some(Twinkle {
+                            brightness: 0.,
+                            rate: rand_logit() * 10. + 6.,
+                            state: false,
+                            extra_co: rand_u8(),
+                        })
+                    }
+                    [0, 0, 0]
+                };
+                if r {
+                    *twinkle = None;
+                }
             }
-        } else {
-            if rand_bool(Some(0.01)) {
-                *twinkle = Some(Twinkle {
-                    brightness: 0.,
-                    rate: rand_logit() * 10. + 6.,
-                    state: false,
-                    extra_co: rand_u8(),
-                })
-            }
-            [0, 0, 0]
-        };
-        if r {
-            *twinkle = None;
+            next_tick().await;
         }
     }
 }
