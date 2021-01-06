@@ -3,6 +3,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
+use pin_project::pin_project;
 
 pub(super) static mut CURRENT_TICK: bool = false;
 pub(super) static mut TICKS_ELAPSED: u64 = 0;
@@ -70,4 +71,31 @@ impl Future for NextTick {
             }
         }
     }
+}
+
+#[pin_project]
+pub struct Select<T, U>(#[pin] T, #[pin] U);
+
+impl<T: Future<Output = ()>, U: Future<Output = ()>> Future for Select<T, U> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let mut pending = false;
+        if let Poll::Pending = this.0.poll(cx) {
+            pending = true;
+        }
+        if let Poll::Pending = this.1.poll(cx) {
+            pending = true;
+        }
+        if pending {
+            Poll::Pending
+        } else {
+            Poll::Ready(())
+        }
+    }
+}
+
+pub fn select<T: Future<Output = ()>, U: Future<Output = ()>>(a: T, b: U) -> Select<T, U> {
+    Select(a, b)
 }

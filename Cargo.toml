@@ -14,3 +14,8 @@ lto = true
 
 [dependencies]
 pin-project = "1.0.3"
+
+[features]
+default = ["twinkle"]
+twinkle = []
+example = []

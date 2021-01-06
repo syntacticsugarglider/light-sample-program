@@ -4,6 +4,7 @@
 #![no_std]
 
 use core::{
+    cell::UnsafeCell,
     future::Future,
     ops::{Bound, Index, IndexMut, RangeBounds},
     panic::PanicInfo,
@@ -17,7 +18,7 @@ use programs::Program;
 pub mod rand;
 pub mod util;
 
-pub struct LedStrip(&'static mut [[u8; 3]]);
+pub struct LedStrip(UnsafeCell<&'static mut [[u8; 3]]>);
 
 mod sealed {
 
@@ -32,7 +33,7 @@ pub trait LedExt: sealed::Sealed {
 
     type FadeFuture<'a>: Future<Output = ()> + 'a;
 
-    fn fade_to<'a>(&'a mut self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a>;
+    fn fade_to<'a>(&'a self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a>;
 }
 
 type LedFadeFuture<'a> = impl Future<Output = ()> + 'a;
@@ -46,7 +47,7 @@ impl LedExt for [u8; 3] {
 
     type FadeFuture<'a> = LedFadeFuture<'a>;
 
-    fn fade_to<'a>(&'a mut self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a> {
+    fn fade_to<'a>(&'a self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a> {
         use util::next_tick;
 
         let mut tick = 0;
@@ -67,12 +68,13 @@ impl LedExt for [u8; 3] {
             while tick < ticks {
                 next_tick().await;
                 tick += 1;
+                let this = unsafe { core::slice::from_raw_parts_mut(self.as_ptr() as *mut _, 3) };
                 initial[0] += delta[0];
                 initial[1] += delta[1];
                 initial[2] += delta[2];
-                self[0] = initial[0] as u8;
-                self[1] = initial[1] as u8;
-                self[2] = initial[2] as u8;
+                this[0] = initial[0] as u8;
+                this[1] = initial[1] as u8;
+                this[2] = initial[2] as u8;
             }
         }
     }
@@ -89,18 +91,19 @@ impl LedExt for LedStrip {
 
     type FadeFuture<'a> = LedStripFadeFuture<'a>;
 
-    fn fade_to<'a>(&'a mut self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a> {
+    fn fade_to<'a>(&'a self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a> {
         use util::next_tick;
+        let this = unsafe { &mut *self.0.get() };
 
         let mut tick = 0;
         let max_ticks = ticks as f32;
 
         let mut initial = [[0f32; 3]; 75];
-        for (buffer, current) in initial[..self.0.len()].iter_mut().zip(self.0.iter_mut()) {
+        for (buffer, current) in initial[..this.len()].iter_mut().zip(this.iter_mut()) {
             *buffer = [current[0] as f32, current[1] as f32, current[2] as f32];
         }
         let mut delta = [[0f32; 3]; 75];
-        for (delta, initial) in delta[..self.0.len()].iter_mut().zip(initial.as_mut()) {
+        for (delta, initial) in delta[..this.len()].iter_mut().zip(initial.as_mut()) {
             *delta = [
                 (target[0] as f32 - initial[0]) / max_ticks,
                 (target[1] as f32 - initial[1]) / max_ticks,
@@ -115,7 +118,7 @@ impl LedExt for LedStrip {
                 for ((initial, delta), this) in initial
                     .iter_mut()
                     .zip(delta.iter_mut())
-                    .zip(self.0.iter_mut())
+                    .zip(this.iter_mut())
                 {
                     initial[0] += delta[0];
                     initial[1] += delta[1];
@@ -139,14 +142,18 @@ impl LedStrip {
         let end = match range.end_bound() {
             Bound::Included(bound) => *bound - 1,
             Bound::Excluded(bound) => *bound,
-            Bound::Unbounded => self.0.len(),
+            Bound::Unbounded => self.0.get_mut().len(),
         };
         LedStrip(unsafe {
-            core::slice::from_raw_parts_mut(self.0.as_mut_ptr().add(start), end - start)
+            UnsafeCell::new(core::slice::from_raw_parts_mut(
+                self.0.get_mut().as_mut_ptr().add(start),
+                end - start,
+            ))
         })
     }
     pub fn fill(&mut self, color: [u8; 3]) {
-        for led in self.0.iter_mut() {
+        let buf = self.0.get_mut();
+        for led in buf.iter_mut() {
             *led = color;
         }
     }
@@ -159,13 +166,13 @@ impl Index<usize> for LedStrip {
     type Output = [u8; 3];
 
     fn index(&self, index: usize) -> &Self::Output {
-        self.0.index(index)
+        unsafe { &*self.0.get() }.index(index)
     }
 }
 
 impl IndexMut<usize> for LedStrip {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        self.0.index_mut(index)
+        self.0.get_mut().index_mut(index)
     }
 }
 
@@ -175,7 +182,7 @@ impl IntoIterator for LedStrip {
     type IntoIter = core::slice::IterMut<'static, [u8; 3]>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.0.into_inner().into_iter()
     }
 }
 
@@ -185,7 +192,7 @@ impl<'a> IntoIterator for &'a mut LedStrip {
     type IntoIter = core::slice::IterMut<'a, [u8; 3]>;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&mut self.0).into_iter()
+        self.0.get_mut().into_iter()
     }
 }
 
@@ -194,7 +201,7 @@ mod strip {
 }
 
 pub fn leds() -> LedStrip {
-    LedStrip(unsafe { strip::STRIP.as_mut() })
+    LedStrip(unsafe { UnsafeCell::new(strip::STRIP.as_mut()) })
 }
 
 /// Array of arrays, each sub-array is one light, colors in order RGB.
@@ -253,7 +260,7 @@ extern "C" fn entry() -> *mut Output {
         if let Some(executor) = PROGRAM.as_mut() {
             Pin::new_unchecked(executor).run();
         } else {
-            PROGRAM = Some(Executor(programs::twinkle()));
+            PROGRAM = Some(Executor(programs::program()));
         }
     };
     unsafe { &mut OUTPUT }
