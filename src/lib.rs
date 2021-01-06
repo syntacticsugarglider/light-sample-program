@@ -203,6 +203,14 @@ impl LedStrip {
     pub fn len(&self) -> usize {
         unsafe { &*self.0.get() }.len()
     }
+    pub fn rotate_left(&self, by: usize) -> &Self {
+        unsafe { &mut *self.0.get() }.rotate_left(by);
+        self
+    }
+    pub fn rotate_right(&self, by: usize) -> &Self {
+        unsafe { &mut *self.0.get() }.rotate_right(by);
+        self
+    }
     pub fn range<T: RangeBounds<usize>>(&mut self, range: T) -> LedStrip {
         let start = match range.start_bound() {
             Bound::Included(bound) => *bound,
@@ -224,6 +232,12 @@ impl LedStrip {
     pub fn fill(&mut self, color: [u8; 3]) -> &mut Self {
         let buf = self.0.get_mut();
         for led in buf.iter_mut() {
+            *led = color;
+        }
+        self
+    }
+    fn fill_from<T: IntoIterator<Item = [u8; 3]>>(&mut self, iter: T) -> &mut Self {
+        for (led, color) in self.0.get_mut().iter_mut().zip(iter) {
             *led = color;
         }
         self
@@ -264,6 +278,16 @@ impl<'a> IntoIterator for &'a mut LedStrip {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.get_mut().into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a LedStrip {
+    type Item = &'a mut [u8; 3];
+
+    type IntoIter = core::slice::IterMut<'a, [u8; 3]>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unsafe { &mut *self.0.get() }.into_iter()
     }
 }
 
