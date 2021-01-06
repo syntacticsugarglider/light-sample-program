@@ -2,8 +2,7 @@ use core::future::Future;
 
 use crate::{
     rand::{rand_bool, rand_logit, rand_u8},
-    util::{clear, next_tick},
-    STRIP,
+    util::next_tick,
 };
 
 #[derive(Clone, Copy)]
@@ -46,10 +45,12 @@ pub type Program = impl Future<Output = ()>;
 #[allow(dead_code)]
 pub unsafe fn twinkle() -> Program {
     async move {
-        loop {
-            clear();
+        let mut leds = crate::leds();
 
-            for (twinkle, color) in (&mut ACTIVE[..]).into_iter().zip(STRIP.iter_mut()) {
+        loop {
+            leds.clear();
+
+            for (twinkle, color) in (&mut ACTIVE[..]).into_iter().zip(&mut leds) {
                 let mut r = false;
                 *color = if let Some(twinkle) = twinkle {
                     if let Some((c, b)) = twinkle.update() {
@@ -73,6 +74,7 @@ pub unsafe fn twinkle() -> Program {
                     *twinkle = None;
                 }
             }
+
             next_tick().await;
         }
     }

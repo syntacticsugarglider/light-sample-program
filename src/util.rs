@@ -4,14 +4,6 @@ use core::{
     task::{Context, Poll},
 };
 
-use crate::STRIP;
-
-pub unsafe fn clear() {
-    for color in &mut STRIP[..] {
-        *color = [0, 0, 0];
-    }
-}
-
 pub(super) static mut CURRENT_TICK: bool = false;
 pub(super) static mut TICKS_ELAPSED: u64 = 0;
 
