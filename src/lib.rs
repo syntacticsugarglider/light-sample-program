@@ -61,12 +61,16 @@ pub trait LedExt: sealed::Sealed {
 
     fn normalize(&mut self) -> &mut Self;
 
-    type FadeFuture<'a>: Future<Output = ()> + 'a;
+    type FadeFuture<'a, T: 'a>: Future<Output = ()> + 'a;
 
-    fn fade_to<'a>(&'a self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a>;
+    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a>(
+        &'a self,
+        target: T,
+        ticks: u64,
+    ) -> Self::FadeFuture<'a, T>;
 }
 
-type LedFadeFuture<'a> = impl Future<Output = ()> + 'a;
+type LedFadeFuture<'a, T: 'a> = impl Future<Output = ()> + 'a;
 
 impl LedExt for [u8; 3] {
     fn scale(&mut self, factor: f32) -> &mut Self {
@@ -76,12 +80,18 @@ impl LedExt for [u8; 3] {
         self
     }
 
-    type FadeFuture<'a> = LedFadeFuture<'a>;
+    type FadeFuture<'a, T: 'a> = LedFadeFuture<'a, T>;
 
-    fn fade_to<'a>(&'a self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a> {
+    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a>(
+        &'a self,
+        target: T,
+        ticks: u64,
+    ) -> Self::FadeFuture<'a, T> {
         use util::next_tick;
 
         let mut tick = 0;
+
+        let target = target.into_iter().next().unwrap();
 
         let mut initial = [self[0] as f32, self[1] as f32, self[2] as f32];
         let delta = [
@@ -121,7 +131,7 @@ impl LedExt for [u8; 3] {
     }
 }
 
-type LedStripFadeFuture<'a> = impl Future<Output = ()> + 'a;
+type LedStripFadeFuture<'a, T: 'a> = impl Future<Output = ()> + 'a;
 
 impl LedExt for LedStrip {
     fn scale(&mut self, factor: f32) -> &mut Self {
@@ -131,9 +141,13 @@ impl LedExt for LedStrip {
         self
     }
 
-    type FadeFuture<'a> = LedStripFadeFuture<'a>;
+    type FadeFuture<'a, T: 'a> = LedStripFadeFuture<'a, T>;
 
-    fn fade_to<'a>(&'a self, target: [u8; 3], ticks: u64) -> Self::FadeFuture<'a> {
+    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a>(
+        &'a self,
+        target: T,
+        ticks: u64,
+    ) -> Self::FadeFuture<'a, T> {
         use util::next_tick;
         let this = unsafe { &mut *self.0.get() };
 
@@ -145,7 +159,11 @@ impl LedExt for LedStrip {
             *buffer = [current[0] as f32, current[1] as f32, current[2] as f32];
         }
         let mut delta = [[0f32; 3]; 75];
-        for (delta, initial) in delta[..this.len()].iter_mut().zip(initial.as_mut()) {
+        for ((delta, initial), target) in delta[..this.len()]
+            .iter_mut()
+            .zip(initial.as_mut())
+            .zip(target)
+        {
             *delta = [
                 (target[0] as f32 - initial[0]) / max_ticks,
                 (target[1] as f32 - initial[1]) / max_ticks,
@@ -182,6 +200,9 @@ impl LedExt for LedStrip {
 }
 
 impl LedStrip {
+    pub fn len(&self) -> usize {
+        unsafe { &*self.0.get() }.len()
+    }
     pub fn range<T: RangeBounds<usize>>(&mut self, range: T) -> LedStrip {
         let start = match range.start_bound() {
             Bound::Included(bound) => *bound,
