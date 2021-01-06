@@ -1,12 +1,14 @@
 #![feature(type_alias_impl_trait)]
 #![feature(generic_associated_types)]
+#![feature(core_intrinsics)]
 #![allow(incomplete_features)]
 #![no_std]
 
 use core::{
     cell::UnsafeCell,
     future::Future,
-    ops::{Bound, Index, IndexMut, RangeBounds},
+    intrinsics::sqrtf32,
+    ops::{Bound, Index, IndexMut, Mul, MulAssign, RangeBounds},
     panic::PanicInfo,
     pin::Pin,
     task::{Context, RawWaker, RawWakerVTable, Waker},
@@ -28,8 +30,36 @@ mod sealed {
     impl Sealed for super::LedStrip {}
 }
 
+pub struct Scale(pub f32);
+
+impl From<f32> for Scale {
+    fn from(item: f32) -> Self {
+        Scale(item)
+    }
+}
+
+impl Mul<Scale> for [u8; 3] {
+    type Output = [u8; 3];
+
+    fn mul(self, rhs: Scale) -> Self::Output {
+        [
+            (self[0] as f32 * rhs.0) as u8,
+            (self[1] as f32 * rhs.0) as u8,
+            (self[2] as f32 * rhs.0) as u8,
+        ]
+    }
+}
+
+impl MulAssign<Scale> for [u8; 3] {
+    fn mul_assign(&mut self, rhs: Scale) {
+        *self = self.mul(rhs);
+    }
+}
+
 pub trait LedExt: sealed::Sealed {
-    fn scale(&mut self, factor: f32);
+    fn scale(&mut self, factor: f32) -> &mut Self;
+
+    fn normalize(&mut self) -> &mut Self;
 
     type FadeFuture<'a>: Future<Output = ()> + 'a;
 
@@ -39,10 +69,11 @@ pub trait LedExt: sealed::Sealed {
 type LedFadeFuture<'a> = impl Future<Output = ()> + 'a;
 
 impl LedExt for [u8; 3] {
-    fn scale(&mut self, factor: f32) {
-        for element in self {
+    fn scale(&mut self, factor: f32) -> &mut Self {
+        for element in self.as_mut() {
             *element = (*element as f32 * factor) as u8;
         }
+        self
     }
 
     type FadeFuture<'a> = LedFadeFuture<'a>;
@@ -78,15 +109,26 @@ impl LedExt for [u8; 3] {
             }
         }
     }
+
+    fn normalize(&mut self) -> &mut Self {
+        let _0 = self[0] as f32;
+        let _1 = self[1] as f32;
+        let _2 = self[2] as f32;
+        let norm = unsafe { sqrtf32(_0 * _0 + _1 * _1 + _2 * _2) };
+        let factor = 225. / norm;
+        *self *= factor.into();
+        self
+    }
 }
 
 type LedStripFadeFuture<'a> = impl Future<Output = ()> + 'a;
 
 impl LedExt for LedStrip {
-    fn scale(&mut self, factor: f32) {
-        for led in self {
-            led.scale(factor)
+    fn scale(&mut self, factor: f32) -> &mut Self {
+        for led in self.0.get_mut().as_mut() {
+            led.scale(factor);
         }
+        self
     }
 
     type FadeFuture<'a> = LedStripFadeFuture<'a>;
@@ -130,6 +172,13 @@ impl LedExt for LedStrip {
             }
         }
     }
+
+    fn normalize(&mut self) -> &mut Self {
+        for light in &mut *self {
+            light.normalize();
+        }
+        self
+    }
 }
 
 impl LedStrip {
@@ -151,13 +200,14 @@ impl LedStrip {
             ))
         })
     }
-    pub fn fill(&mut self, color: [u8; 3]) {
+    pub fn fill(&mut self, color: [u8; 3]) -> &mut Self {
         let buf = self.0.get_mut();
         for led in buf.iter_mut() {
             *led = color;
         }
+        self
     }
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self) -> &mut Self {
         self.fill([0, 0, 0])
     }
 }
