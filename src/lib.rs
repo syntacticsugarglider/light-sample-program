@@ -8,6 +8,7 @@ use core::{
     cell::UnsafeCell,
     future::Future,
     intrinsics::sqrtf32,
+    iter::repeat,
     ops::{Bound, Index, IndexMut, Mul, MulAssign, RangeBounds},
     panic::PanicInfo,
     pin::Pin,
@@ -229,13 +230,6 @@ impl LedStrip {
             ))
         })
     }
-    pub fn fill(&mut self, color: [u8; 3]) -> &mut Self {
-        let buf = self.0.get_mut();
-        for led in buf.iter_mut() {
-            *led = color;
-        }
-        self
-    }
     fn fill_from<T: IntoIterator<Item = [u8; 3]>>(&mut self, iter: T) -> &mut Self {
         for (led, color) in self.0.get_mut().iter_mut().zip(iter) {
             *led = color;
@@ -243,7 +237,7 @@ impl LedStrip {
         self
     }
     pub fn clear(&mut self) -> &mut Self {
-        self.fill([0, 0, 0])
+        self.fill_from(repeat([0, 0, 0]))
     }
 }
 

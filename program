@@ -1,4 +1,51 @@
 #!env bash
+NEW='--new'
+if [ "$1" = "" ]; then
+    echo "$(cat << EOM
+ESP lights remote programming tool
+
+USAGE:
+    program [OPTIONS] [PROGRAM]
+
+OPTIONS:
+    --new [PROGRAM]   Create a new program from template
+EOM
+)"
+    exit
+fi
+if [ "$1" = "$NEW" ];
+then
+    if [ "$2" == "" ]; then
+        echo "Program name must be non-empty"
+        exit
+    fi
+    FILE="src/programs/$(echo $2).rs"
+    if test -f "$FILE"; then
+        echo "Program \"$2\" already exists"
+        exit
+    fi
+    touch $FILE
+    cat << EOM > $FILE
+use core::{future::Future, iter::repeat};
+
+use crate::util::next_tick;
+
+pub type Program = impl Future<Output = ()>;
+
+#[allow(dead_code)]
+pub unsafe fn $2() -> Program {
+    async move {
+        let mut leds = crate::leds();
+        leds.fill_from(repeat([255, 255, 255]));
+
+        loop {
+            next_tick().await;
+        }
+    }
+}
+EOM
+    exit
+fi
 cargo build --release --features $1 --no-default-features
 cat target/wasm32-unknown-unknown/release/light_program.wasm | wasm-opt -Oz -o build.wasm
 wasm-strip build.wasm

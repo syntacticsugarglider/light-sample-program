@@ -14,7 +14,6 @@ mod _editor_shim {
         async move { panic!() }
     }
 }
-pub use _editor_shim::*;
 "#;
 
 fn main() {
@@ -51,14 +50,19 @@ pub use {name}::{{{name} as program, Program}};\n",
         }
         declarations.push_str(&format!(
             "\n#[cfg(not(any(
-  {}
-)))]{}",
-            programs
+  {cfgs}
+)))]{}
+#[cfg(not(any(
+  {cfgs}
+)))]
+pub use _editor_shim::*;
+",
+            SHIM,
+            cfgs = programs
                 .iter()
                 .map(|program| { format!("feature = {:?}", program) })
                 .collect::<Vec<_>>()
                 .join(", "),
-            SHIM,
         ));
         f.write_all(declarations.as_bytes()).unwrap();
     }

@@ -17,6 +17,7 @@ pin-project = "1.0.3"
 [features]
 example = []
 flow = []
+gradients = []
 oops = []
 twinkle = []
 
