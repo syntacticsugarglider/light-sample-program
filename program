@@ -1,4 +1,5 @@
 #!env bash
+PROGRAMS="$(echo "$(sed 's/\[features\]/%/g' Cargo.toml | tr -d $'\n' | cut -d'%' -f2 | sed 's/\]\[/%/g' | cut -d'%' -f1)]" | sed 's/ = \[\]/\n/g' | xargs echo -n)"
 NEW='--new'
 if [ "$1" = "" ]; then
     echo "$(cat << EOM
@@ -9,8 +10,11 @@ USAGE:
 
 OPTIONS:
     --new [PROGRAM]   Create a new program from template
+
+PROGRAMS:
 EOM
 )"
+    echo "    $(echo $PROGRAMS | sed 's/ /\n    /g')"
     exit
 fi
 if [ "$1" = "$NEW" ];
