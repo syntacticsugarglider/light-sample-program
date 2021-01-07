@@ -230,11 +230,14 @@ impl LedStrip {
             ))
         })
     }
-    fn fill_from<T: IntoIterator<Item = [u8; 3]>>(&mut self, iter: T) -> &mut Self {
+    pub fn fill_from<T: IntoIterator<Item = [u8; 3]>>(&mut self, iter: T) -> &mut Self {
         for (led, color) in self.0.get_mut().iter_mut().zip(iter) {
             *led = color;
         }
         self
+    }
+    pub fn fill(&mut self, color: [u8; 3]) -> &mut Self {
+        self.fill_from(repeat(color))
     }
     pub fn clear(&mut self) -> &mut Self {
         self.fill_from(repeat([0, 0, 0]))
