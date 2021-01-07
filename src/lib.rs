@@ -358,6 +358,13 @@ extern "C" fn entry() -> *mut Output {
     unsafe { &mut OUTPUT }
 }
 
+static mut INPUT_HANDLER: fn(len: usize) -> *mut u8 = |_| core::ptr::null_mut();
+
+#[no_mangle]
+extern "C" fn handle_input(len: usize) -> *mut u8 {
+    unsafe { INPUT_HANDLER(len) }
+}
+
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
