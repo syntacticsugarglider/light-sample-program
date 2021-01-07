@@ -155,7 +155,7 @@ pub fn gradient(start: [u8; 3], end: [u8; 3], steps: usize) -> Gradient {
 
 #[macro_export]
 macro_rules! gradient {
-    ($a:expr => $b:expr, $len:literal; $($c:expr => $d:expr, $e:literal;)*) => {
+    ($a:expr => $b:expr, $len:expr; $($c:expr => $d:expr, $e:expr;)*) => {
         crate::util::gradient($a, $b, $len) $(.chain(crate::util::gradient($c, $d, $e)))*
     };
 }
