@@ -1,23 +1,53 @@
-[package]
-name = "light-program"
-version = "0.1.0"
-authors = ["Izzy Swart <zenerboson@gmail.com>"]
-edition = "2018"
+bench = []
+bin = []
+example = []
+test = []
+[badges.maintenance]
+status = "none"
 
-[lib]
-crate-type = ["cdylib"]
-
-[profile.release]
-opt-level = 'z'
-panic = 'abort'
-lto = true
+[build-dependencies]
+cargo_toml = "0.8.1"
+toml = "0.5.8"
 
 [dependencies]
 pin-project = "1.0.3"
 
+[dev-dependencies]
+
 [features]
-default = ["flow"]
-twinkle = []
-oops = []
 example = []
 flow = []
+oops = []
+twinkle = []
+
+[lib]
+bench = true
+crate-type = ["cdylib"]
+doc = true
+doctest = true
+harness = true
+plugin = false
+proc-macro = false
+required-features = []
+test = true
+
+[package]
+authors = ["Izzy Swart <zenerboson@gmail.com>"]
+autobenches = true
+autobins = true
+autoexamples = true
+autotests = true
+categories = []
+edition = "2018"
+keywords = []
+name = "light-program"
+publish = true
+version = "0.1.0"
+
+[patch]
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"
+
+[target]

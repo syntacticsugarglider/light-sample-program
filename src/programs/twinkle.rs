@@ -1,9 +1,6 @@
 use core::future::Future;
 
-use crate::{
-    rand::{rand_bool, rand_logit, rand_u8},
-    util::next_tick,
-};
+use crate::{rand, util::next_tick, LedExt};
 
 #[derive(Clone, Copy)]
 pub struct Twinkle {
@@ -60,12 +57,12 @@ pub unsafe fn twinkle() -> Program {
                         [0, 0, 0]
                     }
                 } else {
-                    if rand_bool(Some(0.01)) {
+                    if rand::bool(Some(0.01)) {
                         *twinkle = Some(Twinkle {
                             brightness: 0.,
-                            rate: rand_logit() * 10. + 6.,
+                            rate: rand::logit() * 10. + 6.,
                             state: false,
-                            extra_co: rand_u8(),
+                            extra_co: rand::u8(),
                         })
                     }
                     [0, 0, 0]
@@ -74,7 +71,7 @@ pub unsafe fn twinkle() -> Program {
                     *twinkle = None;
                 }
             }
-
+            leds.scale(0.5);
             next_tick().await;
         }
     }

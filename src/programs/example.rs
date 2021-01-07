@@ -1,6 +1,6 @@
 use core::future::Future;
 
-use crate::util::next_tick;
+use crate::{rand, util::gradient, LedExt};
 
 pub type Program = impl Future<Output = ()>;
 
@@ -8,12 +8,13 @@ pub type Program = impl Future<Output = ()>;
 pub unsafe fn example() -> Program {
     async move {
         let mut leds = crate::leds();
-
+        let gradient = {
+            let len = leds.len();
+            move || gradient(*rand::color().normalize(), *rand::color().normalize(), len)
+        };
+        leds.fill_from(gradient());
         loop {
-            leds.clear();
-            leds.fill([255, 255, 255]);
-
-            next_tick().await;
+            leds.fade_to(gradient(), 100).await;
         }
     }
 }
