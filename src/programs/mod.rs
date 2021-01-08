@@ -1,7 +1,7 @@
 // THIS FILE IS AUTO-GENERATED, DO NOT EDIT 
 
 #[cfg(not(any(
-  feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive"
+  feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "current", feature = "receive", feature = "tides"
 )))]
 mod _editor_shim {
     pub type Program = impl core::future::Future<Output = ()>;
@@ -13,30 +13,38 @@ mod _editor_shim {
 }
 
 #[cfg(not(any(
-  feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive"
+  feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "current", feature = "receive", feature = "tides"
 )))]
 pub use _editor_shim::*;
-#[cfg(not(any(feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive")))]
+#[cfg(not(any(feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "current", feature = "receive", feature = "tides")))]
 mod gradients;
 #[cfg(feature = "gradients")]
 pub use gradients::{gradients as program, Program};
-#[cfg(not(any(feature = "gradients", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive")))]
+#[cfg(not(any(feature = "gradients", feature = "oops", feature = "twinkle", feature = "flow", feature = "current", feature = "receive", feature = "tides")))]
 mod example;
 #[cfg(feature = "example")]
 pub use example::{example as program, Program};
-#[cfg(not(any(feature = "gradients", feature = "example", feature = "twinkle", feature = "flow", feature = "receive")))]
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "twinkle", feature = "flow", feature = "current", feature = "receive", feature = "tides")))]
 mod oops;
 #[cfg(feature = "oops")]
 pub use oops::{oops as program, Program};
-#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "flow", feature = "receive")))]
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "flow", feature = "current", feature = "receive", feature = "tides")))]
 mod twinkle;
 #[cfg(feature = "twinkle")]
 pub use twinkle::{twinkle as program, Program};
-#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "receive")))]
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "current", feature = "receive", feature = "tides")))]
 mod flow;
 #[cfg(feature = "flow")]
 pub use flow::{flow as program, Program};
-#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow")))]
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive", feature = "tides")))]
+mod current;
+#[cfg(feature = "current")]
+pub use current::{current as program, Program};
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "current", feature = "tides")))]
 mod receive;
 #[cfg(feature = "receive")]
 pub use receive::{receive as program, Program};
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "current", feature = "receive")))]
+mod tides;
+#[cfg(feature = "tides")]
+pub use tides::{tides as program, Program};
