@@ -21,6 +21,7 @@ use pin_project::pin_project;
 
 mod programs;
 use programs::Program;
+use util::interpolate::{Interpolate, Linear};
 pub mod rand;
 pub mod util;
 
@@ -65,16 +66,16 @@ pub trait LedExt: sealed::Sealed {
 
     fn normalize(&mut self) -> &mut Self;
 
-    type FadeFuture<'a, T: 'a>: Future<Output = ()> + 'a;
+    type FadeFuture<'a, T: 'a, I: 'a>: Future<Output = ()> + 'a;
 
-    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a>(
+    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a, I: Interpolate + 'a>(
         &'a self,
         target: T,
         ticks: u64,
-    ) -> Self::FadeFuture<'a, T>;
+    ) -> Self::FadeFuture<'a, T, I>;
 }
 
-type LedFadeFuture<'a, T: 'a> = impl Future<Output = ()> + 'a;
+type LedFadeFuture<'a, T: 'a, I: 'a> = impl Future<Output = ()> + 'a;
 
 impl LedExt for [u8; 3] {
     fn scale(&mut self, factor: f32) -> &mut Self {
@@ -84,42 +85,28 @@ impl LedExt for [u8; 3] {
         self
     }
 
-    type FadeFuture<'a, T: 'a> = LedFadeFuture<'a, T>;
+    type FadeFuture<'a, T: 'a, I: 'a> = LedFadeFuture<'a, T, I>;
 
-    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a>(
+    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a, I: Interpolate + 'a>(
         &'a self,
         target: T,
         ticks: u64,
-    ) -> Self::FadeFuture<'a, T> {
+    ) -> Self::FadeFuture<'a, T, I> {
         use util::next_tick;
 
         let mut tick = 0;
+        let max_ticks = ticks as f32;
 
         let target = target.into_iter().next().unwrap();
 
-        let mut initial = [self[0] as f32, self[1] as f32, self[2] as f32];
-        let delta = [
-            target[0] as f32 - self[0] as f32,
-            target[1] as f32 - self[1] as f32,
-            target[2] as f32 - self[2] as f32,
-        ];
-        let delta = [
-            delta[0] / ticks as f32,
-            delta[1] / ticks as f32,
-            delta[2] / ticks as f32,
-        ];
+        let initial = *self;
 
         async move {
             while tick < ticks {
                 next_tick().await;
                 tick += 1;
                 let this = unsafe { core::slice::from_raw_parts_mut(self.as_ptr() as *mut _, 3) };
-                initial[0] += delta[0];
-                initial[1] += delta[1];
-                initial[2] += delta[2];
-                this[0] = initial[0] as u8;
-                this[1] = initial[1] as u8;
-                this[2] = initial[2] as u8;
+                this.copy_from_slice(&I::interpolate(&initial, &target, tick as f32 / max_ticks));
             }
         }
     }
@@ -135,7 +122,7 @@ impl LedExt for [u8; 3] {
     }
 }
 
-type LedStripFadeFuture<'a, T: 'a> = impl Future<Output = ()> + 'a;
+type LedStripFadeFuture<'a, T: 'a, I> = impl Future<Output = ()> + 'a;
 
 impl LedExt for LedStrip {
     fn scale(&mut self, factor: f32) -> &mut Self {
@@ -145,51 +132,36 @@ impl LedExt for LedStrip {
         self
     }
 
-    type FadeFuture<'a, T: 'a> = LedStripFadeFuture<'a, T>;
+    type FadeFuture<'a, T: 'a, I: 'a> = LedStripFadeFuture<'a, T, I>;
 
-    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a>(
+    fn fade_to<'a, T: IntoIterator<Item = [u8; 3]> + 'a, I: Interpolate + 'a>(
         &'a self,
-        target: T,
+        iter: T,
         ticks: u64,
-    ) -> Self::FadeFuture<'a, T> {
+    ) -> Self::FadeFuture<'a, T, I> {
         use util::next_tick;
         let this = unsafe { &mut *self.0.get() };
 
         let mut tick = 0;
         let max_ticks = ticks as f32;
 
-        let mut initial = [[0f32; 3]; LED_COUNT];
-        for (buffer, current) in initial[..this.len()].iter_mut().zip(this.iter_mut()) {
-            *buffer = [current[0] as f32, current[1] as f32, current[2] as f32];
-        }
-        let mut delta = [[0f32; 3]; LED_COUNT];
-        for ((delta, initial), target) in delta[..this.len()]
-            .iter_mut()
-            .zip(initial.as_mut())
-            .zip(target)
-        {
-            *delta = [
-                (target[0] as f32 - initial[0]) / max_ticks,
-                (target[1] as f32 - initial[1]) / max_ticks,
-                (target[2] as f32 - initial[2]) / max_ticks,
-            ];
+        let mut initial = [[0u8; 3]; LED_COUNT];
+        initial.copy_from_slice(this);
+        let mut target = [[0u8; 3]; LED_COUNT];
+        for (place, item) in target.iter_mut().zip(iter) {
+            *place = item;
         }
 
         async move {
             while tick < ticks {
                 next_tick().await;
                 tick += 1;
-                for ((initial, delta), this) in initial
+                for ((initial, target), this) in initial
                     .iter_mut()
-                    .zip(delta.iter_mut())
+                    .zip(target.iter_mut())
                     .zip(this.iter_mut())
                 {
-                    initial[0] += delta[0];
-                    initial[1] += delta[1];
-                    initial[2] += delta[2];
-                    this[0] = initial[0] as u8;
-                    this[1] = initial[1] as u8;
-                    this[2] = initial[2] as u8;
+                    *this = Linear::interpolate(initial, target, tick as f32 / max_ticks);
                 }
             }
         }

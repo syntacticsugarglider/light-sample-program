@@ -1,5 +1,6 @@
 use core::{
     future::Future,
+    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
 };
@@ -100,63 +101,43 @@ pub fn select<T: Future<Output = ()>, U: Future<Output = ()>>(a: T, b: U) -> Sel
     Select(a, b)
 }
 
-pub fn lerp(a: [u8; 3], b: [u8; 3], factor: f32) -> [u8; 3] {
-    let delta = [
-        b[0] as f32 - a[0] as f32,
-        b[1] as f32 - a[1] as f32,
-        b[2] as f32 - a[2] as f32,
-    ];
-    [
-        (a[0] as f32 + (delta[0] * factor)) as u8,
-        (a[1] as f32 + (delta[1] * factor)) as u8,
-        (a[2] as f32 + (delta[2] * factor)) as u8,
-    ]
-}
-
 #[derive(Clone)]
-pub struct Gradient {
-    state: [f32; 3],
-    delta: [f32; 3],
-    left: usize,
+pub struct Gradient<I> {
+    start: [u8; 3],
+    end: [u8; 3],
+    max: usize,
+    current: usize,
+    _marker: PhantomData<I>,
 }
 
-impl Iterator for Gradient {
+impl<I: Interpolate> Iterator for Gradient<I> {
     type Item = [u8; 3];
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.left == 0 {
+        if self.current == self.max {
             return None;
         }
-        let ret = [
-            self.state[0] as u8,
-            self.state[1] as u8,
-            self.state[2] as u8,
-        ];
-        self.left -= 1;
-        self.state[0] += self.delta[0];
-        self.state[1] += self.delta[1];
-        self.state[2] += self.delta[2];
+        let ratio = self.current as f32 / self.max as f32;
+        let ret = I::interpolate(&self.start, &self.end, ratio);
+        self.current += 1;
         Some(ret)
     }
 }
 
-pub fn gradient(start: [u8; 3], end: [u8; 3], steps: usize) -> Gradient {
-    let steps = steps - 1;
+pub fn gradient<I: Interpolate>(start: [u8; 3], end: [u8; 3], max: usize) -> Gradient<I> {
     Gradient {
-        state: [start[0] as f32, start[1] as f32, start[2] as f32],
-        delta: [
-            (end[0] as f32 - start[0] as f32) / steps as f32,
-            (end[1] as f32 - start[1] as f32) / steps as f32,
-            (end[2] as f32 - start[2] as f32) / steps as f32,
-        ],
-        left: steps + 1,
+        start,
+        end,
+        max,
+        current: 0,
+        _marker: PhantomData,
     }
 }
 
 #[macro_export]
 macro_rules! gradient {
-    ($a:expr => $b:expr, $len:expr; $($c:expr => $d:expr, $e:expr;)*) => {
-        crate::util::gradient($a, $b, $len) $(.chain(crate::util::gradient($c, $d, $e)))*
+    ($a:expr => $b:expr, $interp:ty, $len:expr; $($c:expr => $d:expr, $e:ty, $f:expr;)*) => {
+        crate::util::gradient::<$interp>($a, $b, $len) $(.chain(crate::util::gradient::<$e>($c, $d, $f)))*
     };
 }
 
@@ -179,5 +160,8 @@ macro_rules! select {
 
 pub use crate::select;
 
+use self::interpolate::Interpolate;
+
 #[allow(non_upper_case_globals)]
 pub mod colors;
+pub mod interpolate;

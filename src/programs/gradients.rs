@@ -1,6 +1,10 @@
 use core::future::Future;
 
-use crate::{rand, util::gradient, LedExt};
+use crate::{
+    rand,
+    util::{gradient, interpolate::Linear},
+    LedExt,
+};
 
 pub type Program = impl Future<Output = ()>;
 
@@ -10,11 +14,11 @@ pub unsafe fn gradients() -> Program {
         let mut leds = crate::leds();
         let gradient = {
             let len = leds.len();
-            move || gradient(*rand::color().normalize(), *rand::color().normalize(), len)
+            move || gradient::<Linear>(*rand::color().normalize(), *rand::color().normalize(), len)
         };
         leds.fill_from(gradient());
         loop {
-            leds.fade_to(gradient(), 100).await;
+            leds.fade_to::<_, Linear>(gradient(), 100).await;
         }
     }
 }

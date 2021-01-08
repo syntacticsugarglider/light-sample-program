@@ -1,6 +1,6 @@
 use core::{future::Future, iter::repeat};
 
-use crate::util::{gradient, next_tick};
+use crate::util::{gradient, interpolate::Linear, next_tick};
 
 pub type Program = impl Future<Output = ()>;
 
@@ -10,8 +10,8 @@ pub unsafe fn flow() -> Program {
         let mut leds = crate::leds();
         leds.fill_from(
             repeat(gradient![
-                [255, 0, 0] => [0, 0, 255], 37;
-                [0, 0, 255] => [255, 0, 0], 38;
+                [255, 0, 0] => [0, 0, 255], Linear, 37;
+                [0, 0, 255] => [255, 0, 0], Linear, 38;
             ])
             .flatten(),
         );

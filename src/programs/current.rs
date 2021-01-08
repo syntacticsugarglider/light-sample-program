@@ -1,6 +1,10 @@
 use core::{future::Future, iter::repeat};
 
-use crate::util::{gradient, lerp, next_tick};
+use crate::util::{
+    gradient,
+    interpolate::{Interpolate, Linear},
+    next_tick,
+};
 
 pub type Program = impl Future<Output = ()>;
 
@@ -19,12 +23,12 @@ pub unsafe fn current() -> Program {
         let mut raw_idx = 0;
         loop {
             let ratio = frame_idx as f32 / len;
-            let a = lerp(a1, a2, ratio);
-            let b = lerp(b1, b2, ratio);
+            let a = Linear::interpolate(&a1, &a2, ratio);
+            let b = Linear::interpolate(&b1, &b2, ratio);
             leds.fill_from(
                 repeat(gradient![
-                    a => b, 38;
-                    b => a, 38;
+                    a => b, Linear, 38;
+                    b => a, Linear, 38;
                 ])
                 .flatten()
                 .skip(raw_idx),
