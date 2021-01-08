@@ -29,3 +29,23 @@ impl Interpolate for SinusoidalInOut {
         Linear::interpolate(a, b, factor)
     }
 }
+
+#[derive(Clone, Copy)]
+pub struct SinusoidalOut;
+
+impl Interpolate for SinusoidalOut {
+    fn interpolate(a: &[u8; 3], b: &[u8; 3], factor: f32) -> [u8; 3] {
+        let factor = nikisas::sin(factor * core::f32::consts::FRAC_PI_2);
+        Linear::interpolate(a, b, factor)
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct SinusoidalIn;
+
+impl Interpolate for SinusoidalIn {
+    fn interpolate(a: &[u8; 3], b: &[u8; 3], factor: f32) -> [u8; 3] {
+        let factor = nikisas::sin((factor - 1.0) * core::f32::consts::FRAC_PI_2) + 1.0;
+        Linear::interpolate(a, b, factor)
+    }
+}
