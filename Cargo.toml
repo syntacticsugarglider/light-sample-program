@@ -12,6 +12,12 @@ toml = "0.5.8"
 [dependencies]
 pin-project = "1.0.3"
 
+[dependencies.futures]
+default-features = false
+features = []
+optional = false
+version = "0.3.8"
+
 [dev-dependencies]
 
 [features]
@@ -19,6 +25,7 @@ example = []
 flow = []
 gradients = []
 oops = []
+receive = []
 twinkle = []
 
 [lib]

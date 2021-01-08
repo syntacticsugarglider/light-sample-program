@@ -14,6 +14,7 @@ use core::{
     pin::Pin,
     task::{Context, RawWaker, RawWakerVTable, Waker},
 };
+use futures::Stream;
 use pin_project::pin_project;
 
 mod programs;
@@ -363,6 +364,95 @@ static mut INPUT_HANDLER: fn(len: usize) -> *mut u8 = |_| core::ptr::null_mut();
 #[no_mangle]
 extern "C" fn handle_input(len: usize) -> *mut u8 {
     unsafe { INPUT_HANDLER(len) }
+}
+
+pub trait Receiver<const LEN: usize>: Stream<Item = ([u8; LEN], usize)> {
+    type ExactStream: ExactReceiver<LEN>;
+
+    fn exact(self) -> Self::ExactStream
+    where
+        Self: Sized;
+}
+
+pub trait ExactReceiver<const LEN: usize>: Stream<Item = [u8; LEN]> {}
+
+#[macro_export]
+macro_rules! Receiver {
+    ($len:expr) => {{
+        let receiver_data: receiver_hidden::Receiver = receiver_hidden::Receiver(());
+        #[doc(hidden)]
+        mod receiver_hidden {
+            #[no_mangle]
+            pub static mut RECEIVER_MUST_BE_UNIQUE: () = ();
+            pub static mut DATA_AVAILABLE: bool = false;
+            pub static mut DATA: [u8; $len] = [0u8; $len];
+            pub static mut LEN: usize = 0;
+            pub(super) struct Receiver(pub(super) ());
+        }
+        impl crate::Receiver<$len> for receiver_hidden::Receiver {
+            type ExactStream = impl crate::ExactReceiver<$len>;
+
+            fn exact(self) -> Self::ExactStream
+            where
+                Self: Sized,
+            {
+                struct ExactWrapper(receiver_hidden::Receiver);
+
+                impl ::futures::Stream for ExactWrapper {
+                    type Item = [u8; $len];
+
+                    fn poll_next<'a>(
+                        mut self: ::core::pin::Pin<&'a mut Self>,
+                        cx: &mut ::core::task::Context<'_>,
+                    ) -> ::core::task::Poll<Option<Self::Item>> {
+                        match core::pin::Pin::new(&mut self.0).poll_next(cx) {
+                            ::core::task::Poll::Ready(Some((data, _))) => {
+                                ::core::task::Poll::Ready(Some(data))
+                            }
+                            _ => ::core::task::Poll::Pending,
+                        }
+                    }
+                }
+
+                impl crate::ExactReceiver<$len> for ExactWrapper {}
+
+                ExactWrapper(self)
+            }
+        }
+        impl ::futures::Stream for receiver_hidden::Receiver {
+            type Item = ([u8; $len], usize);
+
+            fn poll_next<'a>(
+                self: ::core::pin::Pin<&'a mut Self>,
+                _: &mut ::core::task::Context<'_>,
+            ) -> ::core::task::Poll<Option<Self::Item>> {
+                unsafe {
+                    if receiver_hidden::DATA_AVAILABLE {
+                        receiver_hidden::DATA_AVAILABLE = false;
+                        ::core::task::Poll::Ready(Some((
+                            receiver_hidden::DATA,
+                            receiver_hidden::LEN,
+                        )))
+                    } else {
+                        ::core::task::Poll::Pending
+                    }
+                }
+            }
+        }
+        #[allow(unused_unsafe)]
+        unsafe {
+            crate::INPUT_HANDLER = |len| {
+                if receiver_hidden::DATA_AVAILABLE || len > $len {
+                    core::ptr::null_mut()
+                } else {
+                    receiver_hidden::DATA_AVAILABLE = true;
+                    receiver_hidden::LEN = len;
+                    receiver_hidden::DATA.as_mut_ptr()
+                }
+            };
+        }
+        receiver_data
+    }};
 }
 
 #[panic_handler]

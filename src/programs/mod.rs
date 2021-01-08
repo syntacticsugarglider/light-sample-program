@@ -15,9 +15,12 @@ pub use twinkle::{twinkle as program, Program};
 mod flow;
 #[cfg(feature = "flow")]
 pub use flow::{flow as program, Program};
+mod receive;
+#[cfg(feature = "receive")]
+pub use receive::{receive as program, Program};
 
 #[cfg(not(any(
-  feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow"
+  feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive"
 )))]
 mod _editor_shim {
     pub type Program = impl core::future::Future<Output = ()>;
@@ -29,6 +32,6 @@ mod _editor_shim {
 }
 
 #[cfg(not(any(
-  feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow"
+  feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive"
 )))]
 pub use _editor_shim::*;
