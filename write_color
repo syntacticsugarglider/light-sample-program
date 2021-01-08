@@ -1,2 +1,2 @@
 #!env bash
-echo -en $(echo -n $1 | sed -r 's/(.{2})/\\x\1/g;s/,$//') | curl -X POST --data-binary @- http://lightsmanager.syntacticsugarglider.com/write/192.168.4.203
+echo -en $(echo -n $1 | sed -r 's/(.{2})/\\x\1/g;s/,$//') | curl -X POST --data-binary @- http://lightsmanager.syntacticsugarglider.com/write/$ESP_AUTH_TOKEN/192.168.4.203

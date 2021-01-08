@@ -53,6 +53,6 @@ fi
 cargo build --release --features $1 --no-default-features
 cat target/wasm32-unknown-unknown/release/light_program.wasm | wasm-opt -Oz -o build.wasm
 wasm-strip build.wasm
-curl --data-binary "@build.wasm" http://lightsmanager.syntacticsugarglider.com/upload/192.168.4.203
+curl --data-binary "@build.wasm" http://lightsmanager.syntacticsugarglider.com/upload/$ESP_AUTH_TOKEN/192.168.4.203
 echo "sent $(cat build.wasm | wc -c) bytes"
 rm build.wasm
