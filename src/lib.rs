@@ -406,7 +406,7 @@ macro_rules! Receiver {
                         cx: &mut ::core::task::Context<'_>,
                     ) -> ::core::task::Poll<Option<Self::Item>> {
                         match core::pin::Pin::new(&mut self.0).poll_next(cx) {
-                            ::core::task::Poll::Ready(Some((data, _))) => {
+                            ::core::task::Poll::Ready(Some((data, $len))) => {
                                 ::core::task::Poll::Ready(Some(data))
                             }
                             _ => ::core::task::Poll::Pending,

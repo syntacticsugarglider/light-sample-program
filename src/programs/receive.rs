@@ -1,4 +1,4 @@
-use core::{future::Future, iter::repeat};
+use core::future::Future;
 
 use crate::Receiver;
 use futures::StreamExt;
@@ -13,7 +13,7 @@ pub unsafe fn receive() -> Program {
         let mut leds = crate::leds();
 
         while let Some(color) = receiver.next().await {
-            leds.fill_from(repeat(color));
+            leds.fill(color);
         }
     }
 }
