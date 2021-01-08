@@ -28,6 +28,7 @@ fn main() {
             .open(programs_dir.join("mod.rs"))
             .unwrap();
         let mut declarations = format!("// THIS FILE IS AUTO-GENERATED, DO NOT EDIT \n\n");
+        let mut mod_declarations = vec![];
         for path in std::fs::read_dir(programs_dir).unwrap() {
             let name = path
                 .unwrap()
@@ -41,15 +42,18 @@ fn main() {
                 continue;
             }
             programs.push(name.clone());
-            declarations.push_str(&format!(
-                "mod {name};
+            mod_declarations.push((
+                format!(
+                    "mod {name};
 #[cfg(feature = {:?})]
 pub use {name}::{{{name} as program, Program}};\n",
-                name = name
+                    name = name
+                ),
+                name,
             ));
         }
         declarations.push_str(&format!(
-            "\n#[cfg(not(any(
+            "#[cfg(not(any(
   {cfgs}
 )))]{}
 #[cfg(not(any(
@@ -64,6 +68,20 @@ pub use _editor_shim::*;
                 .collect::<Vec<_>>()
                 .join(", "),
         ));
+        for (declaration, name) in mod_declarations {
+            let cfgs = programs
+                .iter()
+                .filter_map(|program| {
+                    if program == &name {
+                        None
+                    } else {
+                        Some(format!("feature = {:?}", program))
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            declarations.push_str(&format!("#[cfg(not(any({})))]\n{}", cfgs, declaration));
+        }
         f.write_all(declarations.as_bytes()).unwrap();
     }
     let mut buf = String::new();

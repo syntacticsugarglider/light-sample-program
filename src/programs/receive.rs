@@ -6,7 +6,7 @@ use futures::StreamExt;
 pub type Program = impl Future<Output = ()>;
 
 #[allow(dead_code)]
-pub unsafe fn example() -> Program {
+pub unsafe fn receive() -> Program {
     let mut receiver = Receiver!(3).exact();
 
     async move {

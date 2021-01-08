@@ -1,24 +1,5 @@
 // THIS FILE IS AUTO-GENERATED, DO NOT EDIT 
 
-mod gradients;
-#[cfg(feature = "gradients")]
-pub use gradients::{gradients as program, Program};
-mod example;
-#[cfg(feature = "example")]
-pub use example::{example as program, Program};
-mod oops;
-#[cfg(feature = "oops")]
-pub use oops::{oops as program, Program};
-mod twinkle;
-#[cfg(feature = "twinkle")]
-pub use twinkle::{twinkle as program, Program};
-mod flow;
-#[cfg(feature = "flow")]
-pub use flow::{flow as program, Program};
-mod receive;
-#[cfg(feature = "receive")]
-pub use receive::{receive as program, Program};
-
 #[cfg(not(any(
   feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive"
 )))]
@@ -35,3 +16,27 @@ mod _editor_shim {
   feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive"
 )))]
 pub use _editor_shim::*;
+#[cfg(not(any(feature = "example", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive")))]
+mod gradients;
+#[cfg(feature = "gradients")]
+pub use gradients::{gradients as program, Program};
+#[cfg(not(any(feature = "gradients", feature = "oops", feature = "twinkle", feature = "flow", feature = "receive")))]
+mod example;
+#[cfg(feature = "example")]
+pub use example::{example as program, Program};
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "twinkle", feature = "flow", feature = "receive")))]
+mod oops;
+#[cfg(feature = "oops")]
+pub use oops::{oops as program, Program};
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "flow", feature = "receive")))]
+mod twinkle;
+#[cfg(feature = "twinkle")]
+pub use twinkle::{twinkle as program, Program};
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "receive")))]
+mod flow;
+#[cfg(feature = "flow")]
+pub use flow::{flow as program, Program};
+#[cfg(not(any(feature = "gradients", feature = "example", feature = "oops", feature = "twinkle", feature = "flow")))]
+mod receive;
+#[cfg(feature = "receive")]
+pub use receive::{receive as program, Program};

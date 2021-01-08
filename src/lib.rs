@@ -383,7 +383,7 @@ macro_rules! Receiver {
         #[doc(hidden)]
         mod receiver_hidden {
             #[no_mangle]
-            pub static mut RECEIVER_MUST_BE_UNIQUE: () = ();
+            static mut RECEIVER_MUST_BE_UNIQUE: () = ();
             pub static mut DATA_AVAILABLE: bool = false;
             pub static mut DATA: [u8; $len] = [0u8; $len];
             pub static mut LEN: usize = 0;
