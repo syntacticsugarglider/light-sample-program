@@ -4,6 +4,8 @@
 #![allow(incomplete_features)]
 #![no_std]
 
+const LED_COUNT: usize = 75;
+
 use core::{
     cell::UnsafeCell,
     future::Future,
@@ -156,11 +158,11 @@ impl LedExt for LedStrip {
         let mut tick = 0;
         let max_ticks = ticks as f32;
 
-        let mut initial = [[0f32; 3]; 75];
+        let mut initial = [[0f32; 3]; LED_COUNT];
         for (buffer, current) in initial[..this.len()].iter_mut().zip(this.iter_mut()) {
             *buffer = [current[0] as f32, current[1] as f32, current[2] as f32];
         }
-        let mut delta = [[0f32; 3]; 75];
+        let mut delta = [[0f32; 3]; LED_COUNT];
         for ((delta, initial), target) in delta[..this.len()]
             .iter_mut()
             .zip(initial.as_mut())
@@ -290,7 +292,7 @@ impl<'a> IntoIterator for &'a LedStrip {
 }
 
 mod strip {
-    pub(super) static mut STRIP: [[u8; 3]; 75] = [[0u8; 3]; 75];
+    pub(super) static mut STRIP: [[u8; 3]; crate::LED_COUNT] = [[0u8; 3]; crate::LED_COUNT];
 }
 
 pub fn leds() -> LedStrip {
@@ -301,7 +303,7 @@ pub fn leds() -> LedStrip {
 static mut OUTPUT: Output = Output {
     buffered: true,
     data: OutputData {
-        buffered: (0, 74, core::ptr::null_mut()),
+        buffered: (0, (crate::LED_COUNT - 1) as u8, core::ptr::null_mut()),
     },
 };
 

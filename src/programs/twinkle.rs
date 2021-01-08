@@ -35,7 +35,7 @@ impl Twinkle {
     }
 }
 
-static mut ACTIVE: &'static mut [Option<Twinkle>; 75] = &mut [None; 75];
+static mut ACTIVE: &'static mut [Option<Twinkle>; crate::LED_COUNT] = &mut [None; crate::LED_COUNT];
 
 pub type Program = impl Future<Output = ()>;
 
