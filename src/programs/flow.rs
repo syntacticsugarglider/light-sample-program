@@ -1,9 +1,6 @@
 use core::{future::Future, iter::repeat};
 
-use crate::{
-    util::{gradient, next_tick},
-    LedExt,
-};
+use crate::util::{gradient, next_tick};
 
 pub type Program = impl Future<Output = ()>;
 
@@ -17,8 +14,7 @@ pub unsafe fn flow() -> Program {
                 [0, 0, 255] => [255, 0, 0], 38;
             ])
             .flatten(),
-        )
-        .scale(0.1);
+        );
         loop {
             leds.rotate_left(1);
             next_tick().await;

@@ -4,7 +4,7 @@
 #![allow(incomplete_features)]
 #![no_std]
 
-const LED_COUNT: usize = 75;
+const LED_COUNT: usize = 76;
 
 use core::{
     cell::UnsafeCell,
