@@ -367,14 +367,20 @@ extern "C" fn handle_input(len: usize) -> *mut u8 {
 }
 
 pub trait Receiver<const LEN: usize>: Stream<Item = ([u8; LEN], usize)> {
-    type ExactStream: ExactReceiver<LEN>;
+    type ExactStream: ExactReceiver<LEN> + Unpin;
 
     fn exact(self) -> Self::ExactStream
     where
         Self: Sized;
 }
 
-pub trait ExactReceiver<const LEN: usize>: Stream<Item = [u8; LEN]> {}
+pub trait ExactReceiver<const LEN: usize>: Stream<Item = [u8; LEN]> {
+    type Inner: Receiver<LEN> + Unpin;
+
+    fn into_inner(self) -> Self::Inner
+    where
+        Self: Sized;
+}
 
 #[macro_export]
 macro_rules! Receiver {
@@ -414,7 +420,13 @@ macro_rules! Receiver {
                     }
                 }
 
-                impl crate::ExactReceiver<$len> for ExactWrapper {}
+                impl crate::ExactReceiver<$len> for ExactWrapper {
+                    type Inner = receiver_hidden::Receiver;
+
+                    fn into_inner(self) -> Self::Inner {
+                        self.0
+                    }
+                }
 
                 ExactWrapper(self)
             }
