@@ -19,3 +19,13 @@ impl Interpolate for Linear {
         ]
     }
 }
+
+#[derive(Clone, Copy)]
+pub struct SinusoidalInOut;
+
+impl Interpolate for SinusoidalInOut {
+    fn interpolate(a: &[u8; 3], b: &[u8; 3], factor: f32) -> [u8; 3] {
+        let factor = 0.5 * (1.0 - nikisas::cos(factor * core::f32::consts::PI));
+        Linear::interpolate(a, b, factor)
+    }
+}
