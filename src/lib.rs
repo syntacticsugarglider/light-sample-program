@@ -6,16 +6,21 @@
 
 const LED_COUNT: usize = 76;
 
+#[allow(dead_code)]
+use byte_copy::*;
+
+#[cfg(target_arch = "wasm32")]
+use core::panic::PanicInfo;
 use core::{
     cell::UnsafeCell,
     future::Future,
     intrinsics::sqrtf32,
     iter::repeat,
     ops::{Bound, Index, IndexMut, Mul, MulAssign, RangeBounds},
-    panic::PanicInfo,
     pin::Pin,
     task::{Context, RawWaker, RawWakerVTable, Waker},
 };
+#[allow(dead_code)]
 use futures::Stream;
 use pin_project::pin_project;
 
@@ -28,7 +33,6 @@ pub mod util;
 pub struct LedStrip(UnsafeCell<&'static mut [[u8; 3]]>);
 
 mod sealed {
-
     pub trait Sealed {}
 
     impl Sealed for [u8; 3] {}
@@ -205,6 +209,9 @@ impl LedStrip {
             ))
         })
     }
+    pub fn get_mut(&mut self, idx: usize) -> Option<&mut [u8; 3]> {
+        self.0.get_mut().get_mut(idx)
+    }
     pub fn fill_from<T: IntoIterator<Item = [u8; 3]>>(&mut self, iter: T) -> &mut Self {
         for (led, color) in self.0.get_mut().iter_mut().zip(iter) {
             *led = color;
@@ -340,37 +347,33 @@ extern "C" fn handle_input(len: usize) -> *mut u8 {
     unsafe { INPUT_HANDLER(len) }
 }
 
-pub trait Receiver<const LEN: usize>: Stream<Item = ([u8; LEN], usize)> {
-    type ExactStream: ExactReceiver<LEN> + Unpin;
-
-    fn exact(self) -> Self::ExactStream
-    where
-        Self: Sized;
-}
-
-pub trait ExactReceiver<const LEN: usize>: Stream<Item = [u8; LEN]> {
-    type Inner: Receiver<LEN> + Unpin;
-
-    fn into_inner(self) -> Self::Inner
-    where
-        Self: Sized;
-}
-
 #[macro_export]
 macro_rules! Receiver {
+    (type $ty:ty) => {{
+        const fn generate_len() -> usize {
+            <$ty as crate::ByteCopy>::MIN_LENGTH
+        }
+        crate::Receiver!({ generate_len() }).extract::<$ty>()
+    }};
     ($len:expr) => {{
         let receiver_data: receiver_hidden::Receiver = receiver_hidden::Receiver(());
+        const CONST_LEN: usize = $len;
+        pub static mut DATA: [u8; CONST_LEN] = [0u8; CONST_LEN];
         #[doc(hidden)]
-        mod receiver_hidden {
+        pub mod receiver_hidden {
+            #[link_section = "custom_discard"]
             #[no_mangle]
-            static mut RECEIVER_MUST_BE_UNIQUE: () = ();
+            static mut RECEIVER_MUST_BE_UNIQUE: u8 = 0;
             pub static mut DATA_AVAILABLE: bool = false;
-            pub static mut DATA: [u8; $len] = [0u8; $len];
             pub static mut LEN: usize = 0;
             pub(super) struct Receiver(pub(super) ());
         }
-        impl crate::Receiver<$len> for receiver_hidden::Receiver {
-            type ExactStream = impl crate::ExactReceiver<$len>;
+        impl crate::Receiver<CONST_LEN> for receiver_hidden::Receiver
+        where
+            [(); CONST_LEN]: Sized,
+        {
+            type ExactStream = impl crate::ExactReceiver<CONST_LEN>;
+            type ExtractStream<T: Unpin + crate::ByteCopy> = impl crate::Stream<Item = T> + Unpin;
 
             fn exact(self) -> Self::ExactStream
             where
@@ -379,14 +382,17 @@ macro_rules! Receiver {
                 struct ExactWrapper(receiver_hidden::Receiver);
 
                 impl ::futures::Stream for ExactWrapper {
-                    type Item = [u8; $len];
+                    type Item = [u8; CONST_LEN];
 
                     fn poll_next<'a>(
                         mut self: ::core::pin::Pin<&'a mut Self>,
                         cx: &mut ::core::task::Context<'_>,
                     ) -> ::core::task::Poll<Option<Self::Item>> {
                         match core::pin::Pin::new(&mut self.0).poll_next(cx) {
-                            ::core::task::Poll::Ready(Some((data, $len))) => {
+                            ::core::task::Poll::Ready(Some((data, len))) => {
+                                if len != CONST_LEN {
+                                    return ::core::task::Poll::Pending;
+                                }
                                 ::core::task::Poll::Ready(Some(data))
                             }
                             _ => ::core::task::Poll::Pending,
@@ -394,7 +400,7 @@ macro_rules! Receiver {
                     }
                 }
 
-                impl crate::ExactReceiver<$len> for ExactWrapper {
+                impl crate::ExactReceiver<CONST_LEN> for ExactWrapper {
                     type Inner = receiver_hidden::Receiver;
 
                     fn into_inner(self) -> Self::Inner {
@@ -404,9 +410,42 @@ macro_rules! Receiver {
 
                 ExactWrapper(self)
             }
+
+            fn extract<T: Unpin>(self) -> Self::ExtractStream<T>
+            where
+                T: crate::ByteCopy,
+            {
+                struct ByteCopyWrapper<T>(
+                    receiver_hidden::Receiver,
+                    ::core::marker::PhantomData<T>,
+                );
+
+                impl<T> Unpin for ByteCopyWrapper<T> {}
+
+                impl<T: crate::ByteCopy> ::futures::Stream for ByteCopyWrapper<T> {
+                    type Item = T;
+
+                    fn poll_next<'a>(
+                        mut self: ::core::pin::Pin<&'a mut Self>,
+                        cx: &mut ::core::task::Context<'_>,
+                    ) -> ::core::task::Poll<Option<Self::Item>> {
+                        match core::pin::Pin::new(&mut self.0).poll_next(cx) {
+                            ::core::task::Poll::Ready(Some((data, len))) => {
+                                match crate::ByteCopy::extract(&data[..len]) {
+                                    Some(data) => ::core::task::Poll::Ready(Some(data.0)),
+                                    None => ::core::task::Poll::Pending,
+                                }
+                            }
+                            _ => ::core::task::Poll::Pending,
+                        }
+                    }
+                }
+
+                ByteCopyWrapper(self, ::core::marker::PhantomData)
+            }
         }
         impl ::futures::Stream for receiver_hidden::Receiver {
-            type Item = ([u8; $len], usize);
+            type Item = ([u8; CONST_LEN], usize);
 
             fn poll_next<'a>(
                 self: ::core::pin::Pin<&'a mut Self>,
@@ -415,10 +454,7 @@ macro_rules! Receiver {
                 unsafe {
                     if receiver_hidden::DATA_AVAILABLE {
                         receiver_hidden::DATA_AVAILABLE = false;
-                        ::core::task::Poll::Ready(Some((
-                            receiver_hidden::DATA,
-                            receiver_hidden::LEN,
-                        )))
+                        ::core::task::Poll::Ready(Some((DATA, receiver_hidden::LEN)))
                     } else {
                         ::core::task::Poll::Pending
                     }
@@ -428,12 +464,12 @@ macro_rules! Receiver {
         #[allow(unused_unsafe)]
         unsafe {
             crate::INPUT_HANDLER = |len| {
-                if receiver_hidden::DATA_AVAILABLE || len > $len {
+                if receiver_hidden::DATA_AVAILABLE || len > CONST_LEN {
                     core::ptr::null_mut()
                 } else {
                     receiver_hidden::DATA_AVAILABLE = true;
                     receiver_hidden::LEN = len;
-                    receiver_hidden::DATA.as_mut_ptr()
+                    DATA.as_mut_ptr()
                 }
             };
         }
@@ -441,6 +477,7 @@ macro_rules! Receiver {
     }};
 }
 
+#[cfg(target_arch = "wasm32")]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}

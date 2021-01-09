@@ -1,0 +1,9 @@
+[package]
+name = "byte_copy"
+version = "0.1.0"
+authors = ["Izzy Swart <zenerboson@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+futures = { version = "0.3.8", default-features = false }
+arrayvec = { version = "0.5.2", default-features = false }

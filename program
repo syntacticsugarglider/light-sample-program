@@ -1,6 +1,19 @@
 #!env bash
+set -e
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
+
+cd $DIR
+
 PROGRAMS="$(echo "$(sed 's/\[features\]/%/g' Cargo.toml | tr -d $'\n' | cut -d'%' -f2 | sed 's/\]\[/%/g' | cut -d'%' -f1)]" | sed 's/ = \[\]/\n/g' | xargs echo -n)"
 NEW='--new'
+WRITE='--write'
 if [ "$1" = "" ]; then
     echo "$(cat << EOM
 ESP lights remote programming tool
@@ -15,6 +28,12 @@ PROGRAMS:
 EOM
 )"
     echo "    $(echo $PROGRAMS | sed 's/ /\n    /g')"
+    exit
+fi
+if [ "$2" = "$WRITE" ]; then
+    cd write
+    cargo build -p write --example $1
+    ../target/debug/examples/$1
     exit
 fi
 if [ "$1" = "$NEW" ];
@@ -50,8 +69,25 @@ pub unsafe fn $2() -> Program {
 EOM
     exit
 fi
-cargo build --release --features $1 --no-default-features
-cat target/wasm32-unknown-unknown/release/light_program.wasm | wasm-opt -Oz -o build.wasm
+cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features
+cat target/wasm32-unknown-unknown/release/examples/wasm.wasm | wasm-opt -Oz -o build.wasm
+SECTION_FOUND="$(wasm-objdump -j custom_discard -x build.wasm 2>&1 | grep "Section not found" || :)"
+if [ "$SECTION_FOUND" = "" ]; then
+    mkdir -p write/programs
+    FILE="write/programs/$1.rs"
+    if [ ! -f "$FILE" ]; then
+        touch $FILE
+        cat << EOM > $FILE
+use ::write::send;
+
+#[async_std::main]
+async fn main() {
+    send(vec![]).await.unwrap();
+}
+EOM
+        touch $FILE
+    fi
+fi
 wasm-strip build.wasm
 if [ "$ESP_AUTH_TOKEN" = "" ]; then
     echo "ERROR: ESP_AUTH_TOKEN not specified, quitting"

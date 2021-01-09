@@ -1,7 +1,19 @@
 bench = []
 bin = []
-example = []
 test = []
+
+[[example]]
+bench = true
+crate-type = ["cdylib"]
+doc = true
+doctest = true
+harness = true
+name = "wasm"
+path = "src/lib.rs"
+plugin = false
+proc-macro = false
+required-features = []
+test = true
 [badges.maintenance]
 status = "none"
 
@@ -12,6 +24,11 @@ toml = "0.5.8"
 [dependencies]
 nikisas = "0.1.0"
 pin-project = "1.0.3"
+
+[dependencies.byte_copy]
+features = []
+optional = false
+path = "./byte-copy"
 
 [dependencies.futures]
 default-features = false
@@ -34,7 +51,7 @@ twinkle = []
 
 [lib]
 bench = true
-crate-type = ["cdylib"]
+crate-type = ["rlib"]
 doc = true
 doctest = true
 harness = true
@@ -63,3 +80,8 @@ opt-level = "z"
 panic = "abort"
 
 [target]
+
+[workspace]
+default-members = ["byte-copy", "."]
+exclude = []
+members = ["byte-copy", ".", "write"]

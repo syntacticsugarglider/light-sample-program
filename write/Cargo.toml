@@ -1,0 +1,11 @@
+[package]
+name = "write"
+version = "0.1.0"
+authors = ["Izzy Swart <zenerboson@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+light-program = { path = "../" }
+surf =  { version = "2.1.0", default-features = false, features = ["h1-client"] }
+async-std = { version = "1.8.0", features = ["attributes"] }
+
