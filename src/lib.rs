@@ -1,6 +1,7 @@
 #![feature(type_alias_impl_trait)]
 #![feature(generic_associated_types)]
 #![feature(core_intrinsics)]
+#![feature(step_trait)]
 #![allow(incomplete_features)]
 #![no_std]
 
@@ -16,7 +17,7 @@ use core::{
     future::Future,
     intrinsics::sqrtf32,
     iter::repeat,
-    ops::{Bound, Index, IndexMut, Mul, MulAssign, RangeBounds},
+    ops::{Index, IndexMut, Mul, MulAssign},
     pin::Pin,
     task::{Context, RawWaker, RawWakerVTable, Waker},
 };
@@ -27,10 +28,21 @@ use pin_project::pin_project;
 mod programs;
 use programs::Program;
 use util::interpolate::{Interpolate, Linear};
+pub mod projection;
 pub mod rand;
 pub mod util;
 
 pub struct LedStrip(UnsafeCell<&'static mut [[u8; 3]]>);
+
+impl Clone for LedStrip {
+    fn clone(&self) -> Self {
+        let slice = unsafe { &mut *self.0.get() };
+        let len = slice.len();
+        LedStrip(UnsafeCell::new(unsafe {
+            core::slice::from_raw_parts_mut(slice.as_mut_ptr(), len)
+        }))
+    }
+}
 
 mod sealed {
     pub trait Sealed {}
@@ -191,24 +203,7 @@ impl LedStrip {
         unsafe { &mut *self.0.get() }.rotate_right(by);
         self
     }
-    pub fn range<T: RangeBounds<usize>>(&mut self, range: T) -> LedStrip {
-        let start = match range.start_bound() {
-            Bound::Included(bound) => *bound,
-            Bound::Excluded(bound) => *bound + 1,
-            Bound::Unbounded => 0,
-        };
-        let end = match range.end_bound() {
-            Bound::Included(bound) => *bound - 1,
-            Bound::Excluded(bound) => *bound,
-            Bound::Unbounded => self.0.get_mut().len(),
-        };
-        LedStrip(unsafe {
-            UnsafeCell::new(core::slice::from_raw_parts_mut(
-                self.0.get_mut().as_mut_ptr().add(start),
-                end - start,
-            ))
-        })
-    }
+
     pub fn get_mut(&mut self, idx: usize) -> Option<&mut [u8; 3]> {
         self.0.get_mut().get_mut(idx)
     }

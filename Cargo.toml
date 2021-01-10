@@ -36,6 +36,12 @@ features = []
 optional = false
 version = "0.3.8"
 
+[dependencies.num-traits]
+default-features = false
+features = []
+optional = false
+version = "0.2.14"
+
 [dev-dependencies]
 
 [features]
@@ -43,6 +49,7 @@ current = []
 example = []
 flow = []
 gradients = []
+grid = []
 nonlinear = []
 oops = []
 receive = []
