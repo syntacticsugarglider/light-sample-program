@@ -73,7 +73,7 @@ RUSTFLAGS="-C link-args=-zstack-size=32768" cargo build --example wasm --target 
 cat target/wasm32-unknown-unknown/release/examples/wasm.wasm | wasm-opt -Oz -o build.wasm
 SECTION_FOUND="$(wasm-objdump -j custom_discard -x build.wasm 2>&1 | grep "Section not found" || :)"
 if [ "$SECTION_FOUND" = "" ]; then
-    mkdir -p write/programs
+    mkdir -p write/examples
     FILE="write/examples/$1.rs"
     if [ ! -f "$FILE" ]; then
         touch $FILE

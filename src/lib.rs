@@ -432,8 +432,8 @@ macro_rules! Receiver {
                         match core::pin::Pin::new(&mut self.0).poll_next(cx) {
                             ::core::task::Poll::Ready(Some((data, len))) => {
                                 match crate::ByteCopy::extract(&data[..len]) {
-                                    Some(data) => ::core::task::Poll::Ready(Some(data.0)),
-                                    None => ::core::task::Poll::Pending,
+                                    Some((data, _)) => ::core::task::Poll::Ready(Some(data)),
+                                    _ => ::core::task::Poll::Pending,
                                 }
                             }
                             _ => ::core::task::Poll::Pending,

@@ -67,7 +67,7 @@ impl ByteCopy for u8 {
     const MAX_LENGTH: Option<usize> = Some(1);
 
     fn extract<'a>(data: &'a [u8]) -> Option<(Self, usize)> {
-        if data.len() == 1 {
+        if !data.is_empty() {
             Some((data[0], 1))
         } else {
             None
@@ -104,31 +104,39 @@ macro_rules! tuple_impls {
                 crate::fold_maybe_tuple!(<$head>::MAX_LENGTH, $(<$tail>::MAX_LENGTH,)*)
             };
 
-            fn extract<'a>(mut data: &'a [u8]) -> Option<(Self, usize)> {
-                #[allow(non_snake_case)]
-                let mut $head = None::<$head>;
+            fn extract<'a>(#[allow(unused_mut)] mut data: &'a [u8]) -> Option<(Self, usize)> {
+                let mut consumed = 0;
+                #[allow(non_snake_case, unused_assignments)]
+                let $head: $head;
                 $(
-                    #[allow(non_snake_case)]
-                    let mut $tail = None::<$tail>;
+                    #[allow(non_snake_case, unused_assignments)]
+                    let $tail: $tail;
                 )*
-                let init_len = data.len();
+                #[allow(unused_variables, unused_assignments)]
+                let mut last_len = 0;
+                #[allow(unused_assignments)]
                 if let Some((output, len)) = ByteCopy::extract(data) {
-                    $head = Some(output);
-                    if len >= data.len() {
-                        return None;
-                    }
-                    data = &data[len..];
+                    consumed += len;
+                    $head = output;
+                    last_len = len;
+                } else {
+                    return None;
                 }
                 $(
+                    if last_len >= data.len() {
+                        return None;
+                    }
+                    data = &data[last_len..];
+                    #[allow(unused_assignments)]
                     if let Some((output, len)) = ByteCopy::extract(data) {
-                        $tail = Some(output);
-                        if len >= data.len() {
-                            return None;
-                        }
-                        data = &data[len..];
+                        $tail = output;
+                        consumed += len;
+                        last_len = len;
+                    } else {
+                        return None;
                     }
                 )*
-                Some((($head?, $($tail ?,)*), init_len - data.len()))
+                Some((($head, $($tail, )*), consumed))
             }
         }
         tuple_impls!($( $tail, )*);
@@ -155,15 +163,20 @@ where
     where
         Self: Sized,
     {
-        let init_len = data.len();
+        let mut consumed = 0;
         let mut output = [None::<T>; LEN];
+        let mut last_len = 0;
         for item in output.iter_mut() {
+            if last_len >= data.len() {
+                return None;
+            }
+            data = &data[last_len..];
             if let Some((output, len)) = ByteCopy::extract(data) {
                 *item = Some(output);
-                if len >= data.len() {
-                    return None;
-                }
-                data = &data[len..];
+                consumed += len;
+                last_len = len;
+            } else {
+                break;
             }
         }
         let output: Option<ArrayVec<[T; LEN]>> = ArrayVec::from(output).into_iter().collect();
@@ -171,7 +184,7 @@ where
             .map(ArrayVec::into_inner)
             .transpose()
             .unwrap_or_else(|_| panic!())
-            .map(|item| (item, init_len - data.len()))
+            .map(|item| (item, consumed))
     }
 }
 
