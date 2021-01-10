@@ -32,7 +32,7 @@ EOM
 fi
 if [ "$2" = "$WRITE" ]; then
     cd write
-    cargo build -p write --example $1
+    cargo build -p write --example $1 --features light-program/$1
     ../target/debug/examples/$1
     exit
 fi
