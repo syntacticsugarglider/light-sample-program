@@ -69,12 +69,12 @@ pub unsafe fn $2() -> Program {
 EOM
     exit
 fi
-cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features
+RUSTFLAGS="-C link-args=-zstack-size=32768" cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features
 cat target/wasm32-unknown-unknown/release/examples/wasm.wasm | wasm-opt -Oz -o build.wasm
 SECTION_FOUND="$(wasm-objdump -j custom_discard -x build.wasm 2>&1 | grep "Section not found" || :)"
 if [ "$SECTION_FOUND" = "" ]; then
     mkdir -p write/programs
-    FILE="write/programs/$1.rs"
+    FILE="write/examples/$1.rs"
     if [ ! -f "$FILE" ]; then
         touch $FILE
         cat << EOM > $FILE
