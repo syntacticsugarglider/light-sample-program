@@ -72,7 +72,7 @@ EOM
 fi
 if [ "$2" = "$SIMULATE" ]; then
     RUSTFLAGS="-C link-args=-zstack-size=32768" cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features --features _simulator
-    cargo run -p simulator -- target/wasm32-unknown-unknown/release/examples/wasm.wasm ${@:3}
+    cargo run -p simulator --release -- target/wasm32-unknown-unknown/release/examples/wasm.wasm ${@:3}
     exit
 fi
 RUSTFLAGS="-C link-args=-zstack-size=32768" CARGO_PROFILE_RELEASE_PANIC="abort" cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features

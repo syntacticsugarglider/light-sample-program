@@ -32,6 +32,7 @@ impl Space for Linear {
 pub struct FlipX<T: Cartesian2d> {
     space: T,
     width: T::Axis,
+    height: Option<T::Axis>,
 }
 
 impl<T: Cartesian2d> Space for FlipX<T>
@@ -58,12 +59,62 @@ where
     fn width(&self) -> Option<Self::Axis> {
         Some(self.width)
     }
+    fn height(&self) -> Option<Self::Axis> {
+        self.height
+    }
 }
 
 impl<T: Cartesian2d> FlipX<T> {
     pub fn new(space: T) -> Option<Self> {
         Some(FlipX {
             width: space.width()?,
+            height: space.height(),
+            space,
+        })
+    }
+}
+
+#[derive(Clone)]
+pub struct FlipY<T: Cartesian2d> {
+    space: T,
+    height: T::Axis,
+    width: Option<T::Axis>,
+}
+
+impl<T: Cartesian2d> Space for FlipY<T>
+where
+    T::Axis: One + Copy + Sub<Output = T::Axis>,
+{
+    type Coordinate = (T::Axis, T::Axis);
+    type Target = T::Target;
+
+    fn transform(&self, coord: Self::Coordinate) -> Option<<T::Target as Space>::Coordinate> {
+        Some(
+            self.space
+                .transform((coord.0, self.height - coord.1 - one()))?,
+        )
+    }
+}
+
+impl<T: Cartesian2d> Cartesian2d for FlipY<T>
+where
+    T::Axis: Copy + One + Sub<Output = T::Axis>,
+{
+    type Axis = T::Axis;
+
+    fn width(&self) -> Option<Self::Axis> {
+        self.width
+    }
+    fn height(&self) -> Option<Self::Axis> {
+        Some(self.height)
+    }
+}
+
+impl<T: Cartesian2d> FlipY<T> {
+    pub fn new(space: T) -> Option<Self> {
+        Some(FlipY {
+            width: space.width(),
+            height: space.height()?,
             space,
         })
     }
@@ -75,6 +126,13 @@ pub trait Cartesian2dExt: Cartesian2d {
         Self: Sized,
     {
         FlipX::new(self)
+    }
+
+    fn flip_y(self) -> Option<FlipY<Self>>
+    where
+        Self: Sized,
+    {
+        FlipY::new(self)
     }
 
     fn constrain_height(self, height: Self::Axis) -> Option<ConstrainHeight<Self>>
@@ -195,11 +253,11 @@ impl Spatial for LedStrip {
             Bound::Unbounded => 0,
         };
         let end = match range.end_bound() {
-            Bound::Included(bound) => *bound - 1,
+            Bound::Included(bound) => *bound + 1,
             Bound::Excluded(bound) => *bound,
             Bound::Unbounded => self.0.get_mut().len(),
         };
-        if end > self.0.get_mut().len() {
+        if end > self.0.get_mut().len() || end < start {
             return None;
         }
         Some(LedStrip(unsafe {
@@ -233,11 +291,72 @@ impl<T, U> Transformed<T, U> {
     }
 }
 
+#[derive(Clone)]
 pub struct CartesianRange<T, U: Cartesian2d> {
     data: T,
-    space: CartesianSubspace<U>,
+    space: U,
     start: (U::Axis, U::Axis),
-    end: (U::Axis, U::Axis),
+}
+
+impl<T, U: Cartesian2d + Subspace> CartesianRange<T, U> {
+    pub fn shift_add(
+        self,
+        by: <<Self as Spatial>::Space as Space>::Coordinate,
+    ) -> Option<CartesianRange<T, CartesianSubspace<U::Parent>>>
+    where
+        Self: Sized,
+        Self: Spatial<Space = U>,
+        U::Axis: Add<Output = U::Axis> + PartialOrd + Copy,
+        U::Parent: Cartesian2d<Axis = U::Axis> + Clone,
+    {
+        let parent = self.space.parent();
+        let offset = self.space.offset();
+        if let (Some(this_width), Some(width)) = (self.space.width(), parent.width()) {
+            if this_width + by.0 + offset.0 > width {
+                return None;
+            }
+        }
+        if let (Some(this_height), Some(height)) = (self.space.height(), parent.height()) {
+            if this_height + by.1 + offset.1 > height {
+                return None;
+            }
+        }
+        Some(CartesianRange {
+            start: (self.start.0 + by.0, self.start.1 + by.1),
+            space: CartesianSubspace {
+                space: parent.clone(),
+                offset: (offset.0 + by.0, offset.1 + by.1),
+                size: (self.space().width()?, self.space().height()?),
+            },
+            data: self.data,
+        })
+    }
+
+    pub fn shift_sub(
+        self,
+        by: <<Self as Spatial>::Space as Space>::Coordinate,
+    ) -> Option<CartesianRange<T, CartesianSubspace<U::Parent>>>
+    where
+        Self: Sized,
+        Self: Spatial<Space = U>,
+        U::Axis: Add<Output = U::Axis> + Sub<Output = U::Axis> + PartialOrd + Copy,
+        U::Parent: Cartesian2d<Axis = U::Axis> + Clone,
+    {
+        let parent = self.space.parent();
+        let offset = self.space.offset();
+        if self.start.0 < by.0 || self.start.1 < by.1 {
+            return None;
+        }
+        Some(CartesianRange {
+            start: (self.start.0 - by.0, self.start.1 - by.1),
+            space: CartesianSubspace {
+                space: parent.clone(),
+                offset: (offset.0 - by.0, offset.1 - by.1),
+                size: (self.space().width()?, self.space().height()?),
+            },
+            data: self.data,
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -290,11 +409,33 @@ impl<T, U: Cartesian2d> CartesianRange<T, U> {
     }
 }
 
+pub trait Subspace: Space {
+    type Parent: Space;
+
+    fn parent(&self) -> &Self::Parent;
+    fn offset(&self) -> <Self::Parent as Space>::Coordinate;
+}
+
 #[derive(Clone)]
 pub struct CartesianSubspace<T: Cartesian2d> {
     space: T,
     offset: (T::Axis, T::Axis),
     size: (T::Axis, T::Axis),
+}
+
+impl<T: Cartesian2d> Subspace for CartesianSubspace<T>
+where
+    T::Axis: Add<Output = T::Axis> + Copy,
+{
+    type Parent = T;
+
+    fn parent(&self) -> &Self::Parent {
+        &self.space
+    }
+
+    fn offset(&self) -> <Self::Parent as Space>::Coordinate {
+        self.offset
+    }
 }
 
 impl<T: Cartesian2d> Space for CartesianSubspace<T>
@@ -334,11 +475,12 @@ where
         + One
         + Add<Output = <U as Cartesian2d>::Axis>
         + Sub<Output = <U as Cartesian2d>::Axis>
-        + Copy,
+        + Copy
+        + PartialOrd,
 {
     type Space = U;
 
-    type Range = CartesianRange<T, U>;
+    type Range = CartesianRange<T, CartesianSubspace<U>>;
 
     fn range<V: RangeBounds<U::Coordinate>>(&mut self, range: V) -> Option<Self::Range> {
         let start = match range.start_bound() {
@@ -347,13 +489,25 @@ where
             Bound::Unbounded => (zero(), zero()),
         };
         let end = match range.end_bound() {
-            Bound::Included(bound) => (bound.0 - one(), bound.1 - one()),
+            Bound::Included(bound) => (bound.0 + one(), bound.1 + one()),
             Bound::Excluded(bound) => *bound,
             Bound::Unbounded => (self.space.width()?, self.space.height()?),
         };
+        if end.0 < start.0 || end.1 < start.1 {
+            return None;
+        }
+        if let Some(width) = self.space.width() {
+            if end.0 > width {
+                return None;
+            }
+        }
+        if let Some(height) = self.space.height() {
+            if end.1 > height {
+                return None;
+            }
+        }
         Some(CartesianRange {
             start,
-            end,
             data: self.data.clone(),
             space: CartesianSubspace {
                 space: self.space.clone(),
@@ -382,31 +536,45 @@ where
         + One
         + Add<Output = <U as Cartesian2d>::Axis>
         + Sub<Output = <U as Cartesian2d>::Axis>
-        + Copy,
+        + Copy
+        + PartialOrd,
 {
-    type Space = CartesianSubspace<U>;
+    type Space = U;
 
-    type Range = CartesianRange<T, U>;
+    type Range = CartesianRange<T, CartesianSubspace<U>>;
 
     fn range<V: RangeBounds<U::Coordinate>>(&mut self, range: V) -> Option<Self::Range> {
         let start = match range.start_bound() {
             Bound::Included(bound) => *bound,
             Bound::Excluded(bound) => (bound.0 + one(), bound.1 + one()),
-            Bound::Unbounded => (zero(), zero()),
+            Bound::Unbounded => (self.start.0, self.start.1),
         };
         let end = match range.end_bound() {
-            Bound::Included(bound) => (bound.0 - one(), bound.1 - one()),
+            Bound::Included(bound) => (bound.0 + one(), bound.1 + one()),
             Bound::Excluded(bound) => *bound,
-            Bound::Unbounded => (zero(), zero()),
+            Bound::Unbounded => (self.space.width()?, self.space.height()?),
+        };
+        if end.0 < start.0 || end.1 < start.1 {
+            return None;
+        }
+        if let Some(width) = self.space.width() {
+            if end.0 > width {
+                return None;
+            }
+        }
+        if let Some(height) = self.space.height() {
+            if end.1 > height {
+                return None;
+            }
         };
         Some(CartesianRange {
             start: (self.start.0 + start.0, self.start.1 + start.1),
-            end: (
-                end.0 + (self.start.0 + start.0),
-                end.1 + (self.start.1 + start.1),
-            ),
             data: self.data.clone(),
-            space: self.space.clone(),
+            space: CartesianSubspace {
+                space: self.space.clone(),
+                offset: start,
+                size: (end.0 - start.0, end.1 - start.1),
+            },
         })
     }
 
