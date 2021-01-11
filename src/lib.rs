@@ -505,6 +505,6 @@ macro_rules! Receiver {
 
 #[cfg(all(target_arch = "wasm32", not(feature = "_simulator")))]
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
+fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
