@@ -11,9 +11,10 @@ DIR="$( cd -P "$( dirname "$SOURCE" )" >/dev/null 2>&1 && pwd )"
 
 cd $DIR
 
-PROGRAMS="$(echo "$(sed 's/\[features\]/%/g' Cargo.toml | tr -d $'\n' | cut -d'%' -f2 | sed 's/\]\[/%/g' | cut -d'%' -f1)]" | sed 's/ = \[\]/\n/g' | xargs echo -n)"
+PROGRAMS="$(echo "$(sed 's/\[features\]/%/g' Cargo.toml | grep -v simulator | tr -d $'\n' | cut -d'%' -f2 | sed 's/\]\[/%/g' | cut -d'%' -f1)]" | sed 's/ = \[\]/\n/g' | xargs echo -n)"
 NEW='--new'
 WRITE='--write'
+SIMULATE='--simulate'
 if [ "$1" = "" ]; then
     echo "$(cat << EOM
 ESP lights remote programming tool
@@ -69,7 +70,12 @@ pub unsafe fn $2() -> Program {
 EOM
     exit
 fi
-RUSTFLAGS="-C link-args=-zstack-size=32768" cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features
+if [ "$2" = "$SIMULATE" ]; then
+    RUSTFLAGS="-C link-args=-zstack-size=32768" cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features --features _simulator
+    cargo run -p simulator -- target/wasm32-unknown-unknown/release/examples/wasm.wasm ${@:3}
+    exit
+fi
+RUSTFLAGS="-C link-args=-zstack-size=32768" CARGO_PROFILE_RELEASE_PANIC="abort" cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features
 cat target/wasm32-unknown-unknown/release/examples/wasm.wasm | wasm-opt -Oz -o build.wasm
 SECTION_FOUND="$(wasm-objdump -j custom_discard -x build.wasm 2>&1 | grep "Section not found" || :)"
 if [ "$SECTION_FOUND" = "" ]; then

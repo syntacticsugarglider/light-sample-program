@@ -2,15 +2,18 @@
 #![feature(generic_associated_types)]
 #![feature(core_intrinsics)]
 #![feature(step_trait)]
+#![feature(panic_info_message)]
+#![feature(fmt_as_str)]
+#![feature(asm)]
 #![allow(incomplete_features)]
-#![no_std]
+#![cfg_attr(not(feature = "_simulator"), no_std)]
 
 const LED_COUNT: usize = 76;
 
-#[allow(dead_code)]
+#[allow(unused_imports)]
 use byte_copy::*;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(feature = "_simulator")))]
 use core::panic::PanicInfo;
 use core::{
     cell::UnsafeCell,
@@ -21,7 +24,7 @@ use core::{
     pin::Pin,
     task::{Context, RawWaker, RawWakerVTable, Waker},
 };
-#[allow(dead_code)]
+#[allow(unused_imports)]
 use futures::Stream;
 use pin_project::pin_project;
 
@@ -318,8 +321,36 @@ impl<T: Future<Output = ()>> Executor<T> {
 
 static mut PROGRAM: Option<Executor<Program>> = None;
 
+#[cfg(feature = "_simulator")]
+mod panic_data {
+    #[no_mangle]
+    #[used]
+    pub(super) static mut PANIC_DATA: *const u8 = std::ptr::null();
+    #[no_mangle]
+    #[used]
+    pub(super) static mut PANIC_LEN: usize = 0;
+}
+
 #[no_mangle]
 extern "C" fn entry() -> *mut Output {
+    #[cfg(feature = "_simulator")]
+    {
+        std::panic::set_hook(Box::new(|info| {
+            let mut data = String::new();
+            if let Some(s) = info.payload().downcast_ref::<&str>() {
+                data = s.to_string();
+            }
+            if let Some(s) = info.location() {
+                data.push_str(&format!("\r\n{}:{}:{}", s.file(), s.line(), s.column()));
+            }
+            unsafe {
+                panic_data::PANIC_LEN = data.len();
+                panic_data::PANIC_DATA = data.as_bytes().as_ptr();
+            }
+            unsafe { asm!("unreachable") }
+        }));
+    }
+
     unsafe {
         OUTPUT.data.buffered.2 = strip::STRIP.as_mut_ptr();
 
@@ -472,8 +503,8 @@ macro_rules! Receiver {
     }};
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", not(feature = "_simulator")))]
 #[panic_handler]
-fn panic(_info: &PanicInfo) -> ! {
+fn panic(info: &PanicInfo) -> ! {
     loop {}
 }

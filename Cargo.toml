@@ -45,6 +45,7 @@ version = "0.2.14"
 [dev-dependencies]
 
 [features]
+_simulator = []
 current = []
 example = []
 flow = []
@@ -84,11 +85,10 @@ version = "0.1.0"
 [profile.release]
 lto = true
 opt-level = "z"
-panic = "abort"
 
 [target]
 
 [workspace]
 default-members = ["byte-copy", "."]
 exclude = []
-members = ["byte-copy", ".", "write"]
+members = ["byte-copy", ".", "write", "simulator"]

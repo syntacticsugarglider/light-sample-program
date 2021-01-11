@@ -91,6 +91,7 @@ pub use _editor_shim::*;
         .unwrap();
     let mut manifest: cargo_toml::Manifest = toml::from_str(&buf).unwrap();
     manifest.features = BTreeMap::new();
+    manifest.features.insert("_simulator".into(), vec![]);
     for program in programs {
         manifest.features.insert(program, vec![]);
     }
