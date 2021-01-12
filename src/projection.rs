@@ -2,7 +2,7 @@ use core::{
     cell::UnsafeCell,
     iter::Step,
     marker::PhantomData,
-    ops::{Add, Bound, Index, IndexMut, RangeBounds, Sub},
+    ops::{Add, Bound, Index, IndexMut, RangeBounds, Rem, Sub},
 };
 
 use num_traits::{one, zero, One, Zero};
@@ -142,6 +142,17 @@ pub trait Cartesian2dExt: Cartesian2d {
     {
         ConstrainHeight::new(self, height)
     }
+
+    fn into_torus(self) -> Option<Torus<Self>>
+    where
+        Self: Sized,
+    {
+        Some(Torus {
+            height: self.height()?,
+            width: self.width()?,
+            space: self,
+        })
+    }
 }
 
 pub trait CartesianSpatialExt: Spatial
@@ -160,6 +171,41 @@ where
 
     fn clear(&mut self) -> Option<()> {
         self.fill([0, 0, 0])
+    }
+}
+
+#[derive(Clone)]
+pub struct Torus<T: Cartesian2d> {
+    space: T,
+    width: T::Axis,
+    height: T::Axis,
+}
+
+impl<T: Cartesian2d> Space for Torus<T>
+where
+    T::Axis: Rem<Output = T::Axis> + Copy,
+{
+    type Coordinate = T::Coordinate;
+    type Target = T::Target;
+
+    fn transform(&self, coord: Self::Coordinate) -> Option<<T::Target as Space>::Coordinate> {
+        self.space
+            .transform((coord.0 % self.width, coord.1 % self.height))
+    }
+}
+
+impl<T: Cartesian2d> Cartesian2d for Torus<T>
+where
+    <T as Cartesian2d>::Axis: Rem<Output = T::Axis> + Copy,
+{
+    type Axis = T::Axis;
+
+    fn width(&self) -> Option<Self::Axis> {
+        None
+    }
+
+    fn height(&self) -> Option<Self::Axis> {
+        None
     }
 }
 
@@ -242,6 +288,12 @@ pub trait Spatial {
     fn get_mut(&mut self, index: <Self::Space as Space>::Coordinate) -> Option<&mut [u8; 3]>;
 }
 
+pub trait MapSpace<T: Space<Target = <Self::Space as Space>::Target>>: Spatial {
+    type MapSpace: Spatial<Space = T>;
+
+    fn map_space<F: FnOnce(Self::Space) -> Option<T>>(self, call: F) -> Option<Self::MapSpace>;
+}
+
 impl Spatial for LedStrip {
     type Space = Linear;
     type Range = LedStrip;
@@ -280,6 +332,7 @@ impl Spatial for LedStrip {
     }
 }
 
+#[derive(Clone)]
 pub struct Transformed<T, U> {
     data: T,
     space: U,
@@ -583,15 +636,30 @@ where
     }
 }
 
+impl<
+        T: Spatial,
+        S: Space<Target = T::Space> + Cartesian2d + Clone,
+        U: Space<Target = <Self::Space as Space>::Target> + Clone + Cartesian2d<Axis = S::Axis>,
+    > MapSpace<U> for Transformed<T, S>
+where
+    S::Axis: Zero + One + Sub<Output = S::Axis> + Copy + PartialOrd,
+    T: Clone,
+{
+    type MapSpace = Transformed<T, U>;
+
+    fn map_space<F: FnOnce(Self::Space) -> Option<U>>(self, call: F) -> Option<Self::MapSpace> {
+        Some(Transformed {
+            data: self.data,
+            space: call(self.space)?,
+        })
+    }
+}
+
 impl<T: Spatial + Clone, U: Space<Target = T::Space>> Spatial for CartesianRange<T, U>
 where
     U: Cartesian2d + Clone,
-    <U as Cartesian2d>::Axis: Zero
-        + One
-        + Add<Output = <U as Cartesian2d>::Axis>
-        + Sub<Output = <U as Cartesian2d>::Axis>
-        + Copy
-        + PartialOrd,
+    <U as Cartesian2d>::Axis:
+        Zero + One + Sub<Output = <U as Cartesian2d>::Axis> + Copy + PartialOrd,
 {
     type Space = U;
 
@@ -641,6 +709,26 @@ where
     }
     fn get_mut(&mut self, index: U::Coordinate) -> Option<&mut [u8; 3]> {
         self.data.get_mut(self.space.transform(index)?)
+    }
+}
+
+impl<
+        T: Spatial,
+        S: Space<Target = T::Space> + Cartesian2d + Clone,
+        U: Space<Target = <Self::Space as Space>::Target> + Clone + Cartesian2d<Axis = S::Axis>,
+    > MapSpace<U> for CartesianRange<T, S>
+where
+    S::Axis: Zero + One + Sub<Output = S::Axis> + Copy + PartialOrd,
+    T: Clone,
+{
+    type MapSpace = CartesianRange<T, U>;
+
+    fn map_space<F: FnOnce(Self::Space) -> Option<U>>(self, call: F) -> Option<Self::MapSpace> {
+        Some(CartesianRange {
+            data: self.data,
+            space: call(self.space)?,
+            start: self.start,
+        })
     }
 }
 
