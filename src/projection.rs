@@ -357,7 +357,61 @@ impl<T, U: Cartesian2d + Subspace> CartesianRange<T, U> {
             data: self.data,
         })
     }
+
+    pub fn shift<V: ExtractSign<Output = U::Axis>>(
+        self,
+        by: (V, V),
+    ) -> Option<CartesianRange<T, CartesianSubspace<U::Parent>>>
+    where
+        Self: Sized,
+        Self: Spatial<Space = U>,
+        U::Axis: Add<Output = U::Axis> + Sub<Output = U::Axis> + PartialOrd + Copy + Zero + One,
+        U::Parent: Cartesian2d<Axis = U::Axis> + Clone,
+        T: Clone + Spatial<Space = <<U as Subspace>::Parent as Space>::Target>,
+    {
+        let this = self;
+        let this = match by.0.extract_sign() {
+            (value, Sign::Positive) => this.shift_add((value, zero()))?,
+            (value, Sign::Negative) => this.shift_sub((value, zero()))?,
+        };
+        let this = match by.1.extract_sign() {
+            (value, Sign::Positive) => this.shift_add((zero(), value)),
+            (value, Sign::Negative) => this.shift_sub((zero(), value)),
+        };
+        this
+    }
 }
+
+pub enum Sign {
+    Positive,
+    Negative,
+}
+
+pub trait ExtractSign {
+    type Output;
+
+    fn extract_sign(self) -> (Self::Output, Sign);
+}
+
+macro_rules! impl_extract_sign {
+    ($($a:ty, $b:ty),*) => {
+        $(
+            impl ExtractSign for $a {
+                type Output = $b;
+
+                fn extract_sign(self) -> (Self::Output, Sign) {
+                    if self > 0 {
+                        (self as $b, Sign::Positive)
+                    } else {
+                        ((-self) as $b, Sign::Negative)
+                    }
+                }
+            }
+        )*
+    };
+}
+
+impl_extract_sign!(i8, u8, i16, u16, i32, u32, i64, u64, isize, usize);
 
 #[derive(Clone)]
 pub struct ConstrainHeight<T: Cartesian2d> {
