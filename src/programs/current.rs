@@ -1,9 +1,12 @@
 use core::{future::Future, iter::repeat};
 
-use crate::util::{
-    gradient,
-    interpolate::{Interpolate, Linear},
-    next_tick,
+use crate::{
+    projection::LinearSpatialExt,
+    util::{
+        gradient,
+        interpolate::{Interpolate, Linear},
+        next_tick,
+    },
 };
 
 pub type Program = impl Future<Output = ()>;

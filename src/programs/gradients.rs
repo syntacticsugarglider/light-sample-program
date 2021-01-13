@@ -1,6 +1,7 @@
 use core::future::Future;
 
 use crate::{
+    projection::LinearSpatialExt,
     rand,
     util::{gradient, interpolate::Linear},
     LedExt,

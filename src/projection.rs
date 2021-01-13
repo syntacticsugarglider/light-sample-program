@@ -1,6 +1,6 @@
 use core::{
     cell::UnsafeCell,
-    iter::Step,
+    iter::{repeat, Step},
     marker::PhantomData,
     ops::{Add, Bound, Index, IndexMut, RangeBounds, Rem, Sub},
 };
@@ -16,16 +16,61 @@ pub trait Space {
     fn transform(&self, coord: Self::Coordinate) -> Option<<Self::Target as Space>::Coordinate>;
 }
 
-#[derive(Clone)]
-pub struct Linear;
+pub trait Linear: Space {
+    fn len(&self) -> Self::Coordinate;
+}
 
-impl Space for Linear {
+#[derive(Clone)]
+pub struct StripSpace(pub(super) usize);
+
+impl Space for StripSpace {
     type Coordinate = usize;
     type Target = Self;
 
     fn transform(&self, coord: Self::Coordinate) -> Option<<Self as Space>::Coordinate> {
         Some(coord)
     }
+}
+
+impl Linear for StripSpace {
+    fn len(&self) -> Self::Coordinate {
+        self.0
+    }
+}
+
+pub trait LinearSpatialExt: Spatial
+where
+    <Self as Spatial>::Space: Linear,
+    <<Self as Spatial>::Space as Space>::Coordinate: Zero + Step,
+{
+    fn fill_from<T: IntoIterator<Item = [u8; 3]>>(&mut self, iter: T) -> &mut Self {
+        let zero: <<Self as Spatial>::Space as Space>::Coordinate = zero();
+        let len = self.space().len();
+
+        for (color, idx) in iter.into_iter().zip(zero..len) {
+            if let Some(led) = self.get_mut(idx) {
+                *led = color;
+            } else {
+                break;
+            }
+        }
+        self
+    }
+
+    fn fill(&mut self, color: [u8; 3]) -> &mut Self {
+        self.fill_from(repeat(color))
+    }
+
+    fn clear(&mut self) -> &mut Self {
+        self.fill_from(repeat([0, 0, 0]))
+    }
+}
+
+impl<T: Spatial> LinearSpatialExt for T
+where
+    <Self as Spatial>::Space: Linear,
+    <<Self as Spatial>::Space as Space>::Coordinate: Zero + Step,
+{
 }
 
 #[derive(Clone)]
@@ -248,9 +293,9 @@ pub struct SwitchbackGrid<T: Space, U> {
     _marker: PhantomData<T>,
 }
 
-impl<T: Copy + Into<usize>> Space for SwitchbackGrid<Linear, T> {
+impl<T: Copy + Into<usize>> Space for SwitchbackGrid<StripSpace, T> {
     type Coordinate = (T, T);
-    type Target = Linear;
+    type Target = StripSpace;
 
     fn transform(&self, coord: Self::Coordinate) -> Option<usize> {
         if coord.0.into() >= self.stride.into() {
@@ -264,7 +309,7 @@ impl<T: Copy + Into<usize>> Space for SwitchbackGrid<Linear, T> {
     }
 }
 
-impl<T> SwitchbackGrid<Linear, T> {
+impl<T> SwitchbackGrid<StripSpace, T> {
     pub fn new(stride: T) -> Self {
         SwitchbackGrid {
             stride,
@@ -295,7 +340,7 @@ pub trait MapSpace<T: Space<Target = <Self::Space as Space>::Target>>: Spatial {
 }
 
 impl Spatial for LedStrip {
-    type Space = Linear;
+    type Space = StripSpace;
     type Range = LedStrip;
 
     fn range<T: RangeBounds<usize>>(&mut self, range: T) -> Option<LedStrip> {
@@ -312,16 +357,19 @@ impl Spatial for LedStrip {
         if end > self.0.get_mut().len() || end < start {
             return None;
         }
-        Some(LedStrip(unsafe {
-            UnsafeCell::new(core::slice::from_raw_parts_mut(
-                self.0.get_mut().as_mut_ptr().add(start),
-                end - start,
-            ))
-        }))
+        Some(LedStrip(
+            unsafe {
+                UnsafeCell::new(core::slice::from_raw_parts_mut(
+                    self.0.get_mut().as_mut_ptr().add(start),
+                    end - start,
+                ))
+            },
+            StripSpace(end - start),
+        ))
     }
 
-    fn space(&self) -> &Linear {
-        &Linear
+    fn space(&self) -> &StripSpace {
+        &self.1
     }
 
     fn get_mut(&mut self, idx: usize) -> Option<&mut [u8; 3]> {

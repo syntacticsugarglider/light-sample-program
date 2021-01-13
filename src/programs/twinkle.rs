@@ -1,6 +1,6 @@
 use core::future::Future;
 
-use crate::{rand, util::next_tick, LedExt};
+use crate::{projection::LinearSpatialExt, rand, util::next_tick, LedExt};
 
 #[derive(Clone, Copy)]
 pub struct Twinkle {

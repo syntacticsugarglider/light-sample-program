@@ -1,6 +1,6 @@
 use core::future::Future;
 
-use crate::util::next_tick;
+use crate::{projection::LinearSpatialExt, util::next_tick};
 
 pub type Program = impl Future<Output = ()>;
 

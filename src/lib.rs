@@ -1,14 +1,17 @@
 #![feature(type_alias_impl_trait)]
 #![feature(generic_associated_types)]
 #![feature(core_intrinsics)]
+#![feature(const_generics)]
+#![feature(const_evaluatable_checked)]
+#![feature(const_fn)]
+#![feature(const_in_array_repeat_expressions)]
 #![feature(step_trait)]
-#![feature(panic_info_message)]
-#![feature(fmt_as_str)]
+#![feature(iter_map_while)]
 #![feature(asm)]
 #![allow(incomplete_features)]
 #![cfg_attr(not(feature = "_simulator"), no_std)]
 
-const LED_COUNT: usize = 76;
+const LED_COUNT: usize = 84;
 
 #[allow(unused_imports)]
 use byte_copy::*;
@@ -19,7 +22,6 @@ use core::{
     cell::UnsafeCell,
     future::Future,
     intrinsics::sqrtf32,
-    iter::repeat,
     ops::{Index, IndexMut, Mul, MulAssign},
     pin::Pin,
     task::{Context, RawWaker, RawWakerVTable, Waker},
@@ -35,15 +37,16 @@ pub mod projection;
 pub mod rand;
 pub mod util;
 
-pub struct LedStrip(UnsafeCell<&'static mut [[u8; 3]]>);
+pub struct LedStrip(UnsafeCell<&'static mut [[u8; 3]]>, projection::StripSpace);
 
 impl Clone for LedStrip {
     fn clone(&self) -> Self {
         let slice = unsafe { &mut *self.0.get() };
         let len = slice.len();
-        LedStrip(UnsafeCell::new(unsafe {
-            core::slice::from_raw_parts_mut(slice.as_mut_ptr(), len)
-        }))
+        LedStrip(
+            UnsafeCell::new(unsafe { core::slice::from_raw_parts_mut(slice.as_mut_ptr(), len) }),
+            projection::StripSpace(len),
+        )
     }
 }
 
@@ -210,18 +213,6 @@ impl LedStrip {
     pub fn get_mut(&mut self, idx: usize) -> Option<&mut [u8; 3]> {
         self.0.get_mut().get_mut(idx)
     }
-    pub fn fill_from<T: IntoIterator<Item = [u8; 3]>>(&mut self, iter: T) -> &mut Self {
-        for (led, color) in self.0.get_mut().iter_mut().zip(iter) {
-            *led = color;
-        }
-        self
-    }
-    pub fn fill(&mut self, color: [u8; 3]) -> &mut Self {
-        self.fill_from(repeat(color))
-    }
-    pub fn clear(&mut self) -> &mut Self {
-        self.fill_from(repeat([0, 0, 0]))
-    }
 }
 
 impl Index<usize> for LedStrip {
@@ -273,7 +264,10 @@ mod strip {
 }
 
 pub fn leds() -> LedStrip {
-    LedStrip(unsafe { UnsafeCell::new(strip::STRIP.as_mut()) })
+    LedStrip(
+        unsafe { UnsafeCell::new(strip::STRIP.as_mut()) },
+        projection::StripSpace(unsafe { strip::STRIP.len() }),
+    )
 }
 
 /// Array of arrays, each sub-array is one light, colors in order RGB.

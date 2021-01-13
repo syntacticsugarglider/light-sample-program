@@ -1,6 +1,7 @@
 use core::{future::Future, iter::repeat};
 
 use crate::{
+    projection::LinearSpatialExt,
     util::{
         colors,
         interpolate::{Interpolate, Linear, SinusoidalInOut},
