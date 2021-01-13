@@ -8,6 +8,7 @@
 #![feature(step_trait)]
 #![feature(iter_map_while)]
 #![feature(asm)]
+#![feature(specialization)]
 #![allow(incomplete_features)]
 #![cfg_attr(not(feature = "_simulator"), no_std)]
 
