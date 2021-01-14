@@ -12,7 +12,7 @@
 #![allow(incomplete_features)]
 #![cfg_attr(not(feature = "_simulator"), no_std)]
 
-const LED_COUNT: usize = 84;
+const LED_COUNT: usize = 88;
 
 #[allow(unused_imports)]
 use byte_copy::*;
