@@ -30,8 +30,8 @@ pub unsafe fn current() -> Program {
             let b = Linear::interpolate(&b1, &b2, ratio);
             leds.fill_from(
                 repeat(gradient![
-                    a => b, Linear, 38;
-                    b => a, Linear, 38;
+                    a => b, Linear, leds.len() / 2;
+                    b => a, Linear, leds.len() / 2;
                 ])
                 .flatten()
                 .skip(raw_idx),
