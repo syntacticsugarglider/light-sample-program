@@ -100,6 +100,6 @@ if [ "$ESP_AUTH_TOKEN" = "" ]; then
     rm build.wasm
     exit
 fi
-curl --data-binary "@build.wasm" http://lightsmanager.syntacticsugarglider.com/upload/$ESP_AUTH_TOKEN/192.168.4.203
+curl --data-binary "@build.wasm" http://lightsmanager.syntacticsugarglider.com/upload/$ESP_AUTH_TOKEN/192.168.4.238
 echo "sent $(cat build.wasm | wc -c) bytes"
 rm build.wasm
