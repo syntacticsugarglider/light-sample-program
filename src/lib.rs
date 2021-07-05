@@ -1,10 +1,9 @@
 #![feature(type_alias_impl_trait)]
+#![feature(min_type_alias_impl_trait)]
 #![feature(generic_associated_types)]
 #![feature(core_intrinsics)]
 #![feature(const_generics)]
 #![feature(const_evaluatable_checked)]
-#![feature(const_fn)]
-#![feature(const_in_array_repeat_expressions)]
 #![feature(step_trait)]
 #![feature(iter_map_while)]
 #![feature(asm)]
@@ -12,7 +11,7 @@
 #![allow(incomplete_features)]
 #![cfg_attr(not(feature = "_simulator"), no_std)]
 
-const LED_COUNT: usize = 88;
+const LED_COUNT: usize = 104;
 
 #[allow(unused_imports)]
 use byte_copy::*;

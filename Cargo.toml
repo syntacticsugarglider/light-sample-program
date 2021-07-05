@@ -57,6 +57,7 @@ oops = []
 receive = []
 tides = []
 twinkle = []
+valentine = []
 
 [lib]
 bench = true
@@ -85,6 +86,7 @@ version = "0.1.0"
 [patch]
 [profile.release]
 lto = true
+opt-level = "z"
 
 [target]
 

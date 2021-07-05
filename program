@@ -76,7 +76,7 @@ if [ "$2" = "$SIMULATE" ]; then
     exit
 fi
 RUSTFLAGS="-C link-args=-zstack-size=32768" CARGO_PROFILE_RELEASE_PANIC="abort" cargo build --example wasm --target wasm32-unknown-unknown --release --features $1 --no-default-features
-cat target/wasm32-unknown-unknown/release/examples/wasm.wasm | wasm-opt -Oz -o build.wasm
+cat target/wasm32-unknown-unknown/release/examples/wasm.wasm > build.wasm
 SECTION_FOUND="$(wasm-objdump -j custom_discard -x build.wasm 2>&1 | grep "Section not found" || :)"
 if [ "$SECTION_FOUND" = "" ]; then
     mkdir -p write/examples
@@ -100,6 +100,6 @@ if [ "$ESP_AUTH_TOKEN" = "" ]; then
     rm build.wasm
     exit
 fi
-curl --data-binary "@build.wasm" http://lightsmanager.syntacticsugarglider.com/upload/$ESP_AUTH_TOKEN/192.168.4.238
+curl --data-binary "@build.wasm" http://lightsmanager.syntacticsugarglider.com/upload/$ESP_AUTH_TOKEN/192.168.4.203
 echo "sent $(cat build.wasm | wc -c) bytes"
 rm build.wasm

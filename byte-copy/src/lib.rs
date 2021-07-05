@@ -2,8 +2,7 @@
 #![feature(const_generics)]
 #![feature(generic_associated_types)]
 #![feature(const_evaluatable_checked)]
-#![feature(const_fn)]
-#![feature(const_in_array_repeat_expressions)]
+#![feature(const_fn_trait_bound)]
 #![allow(incomplete_features)]
 
 use arrayvec::ArrayVec;
@@ -150,6 +149,7 @@ impl<const LEN: usize, T: ByteCopy> ByteCopy for [T; LEN]
 where
     [T; LEN]: arrayvec::Array<Item = T>,
     [Option<T>; LEN]: arrayvec::Array<Item = Option<T>>,
+    Option<T>: Copy,
 {
     const MAX_LENGTH: Option<usize> = {
         match T::MAX_LENGTH {
