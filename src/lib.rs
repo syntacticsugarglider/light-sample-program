@@ -1,5 +1,4 @@
 #![feature(type_alias_impl_trait)]
-#![feature(min_type_alias_impl_trait)]
 #![feature(generic_associated_types)]
 #![feature(core_intrinsics)]
 #![feature(const_generics)]

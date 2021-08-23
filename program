@@ -15,6 +15,7 @@ PROGRAMS="$(echo "$(sed 's/\[features\]/%/g' Cargo.toml | grep -v simulator | tr
 NEW='--new'
 WRITE='--write'
 SIMULATE='--simulate'
+UPLOAD='--upload'
 if [ "$1" = "" ]; then
     echo "$(cat << EOM
 ESP lights remote programming tool
@@ -95,6 +96,12 @@ EOM
     fi
 fi
 wasm-strip build.wasm
+if [ "$2" = "$UPLOAD" ]; then
+    mv build.wasm "$1.wasm"
+    scp "$1.wasm" syn@192.168.4.250:actions-virtual-device/programs
+    rm "$1.wasm"
+    exit
+fi
 if [ "$ESP_AUTH_TOKEN" = "" ]; then
     echo "ERROR: ESP_AUTH_TOKEN not specified, quitting"
     rm build.wasm
